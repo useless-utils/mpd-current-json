@@ -45,6 +45,16 @@ void escape_json_string(const char* input, char* output) {
   output[output_pos] = '\0';
 }
 
+// Helper function to add a tag to the JSON output
+// Helper function to add a tag to the JSON output
+void add_tag(char* buffer, size_t* buffer_pos, const char* tag_name, const char* tag_value) {
+    if (tag_value != NULL) {
+        char escaped_value[BUFFER_SIZE];
+        escape_json_string(tag_value, escaped_value);
+        *buffer_pos += snprintf(buffer + *buffer_pos, BUFFER_SIZE - *buffer_pos, "\"%s\":\"%s\",", tag_name, escaped_value);
+    }
+}
+
 int main(int argc, char* argv[]) {
   int port = 6600;
   int verbose = 0;
@@ -85,53 +95,46 @@ int main(int argc, char* argv[]) {
   }
 
   char buffer[BUFFER_SIZE];
-  int buffer_pos = 0;
+  size_t buffer_pos = 0;
 
   // open json object
-  buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "{\n");
+  buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "{");
 
   // Parse song information
   // [[https://www.musicpd.org/doc/libmpdclient/tag_8h.html][libmpdclient: mpd/tag.h File Reference]]
-  const char* title = mpd_song_get_tag(song, MPD_TAG_TITLE, 0);
-  const char* artist = mpd_song_get_tag(song, MPD_TAG_ARTIST, 0);
-  const char* album = mpd_song_get_tag(song, MPD_TAG_ALBUM, 0);
-  const char* genre = mpd_song_get_tag(song, MPD_TAG_GENRE, 0);
-  int duration = mpd_song_get_duration(song);
-  const char* album_artist = mpd_song_get_tag(song, MPD_TAG_ALBUM_ARTIST, 0);
+  add_tag(buffer, &buffer_pos, "artist", mpd_song_get_tag(song, MPD_TAG_ARTIST, 0));
+  add_tag(buffer, &buffer_pos, "album", mpd_song_get_tag(song, MPD_TAG_ALBUM, 0));
+  add_tag(buffer, &buffer_pos, "album_artist", mpd_song_get_tag(song, MPD_TAG_ALBUM_ARTIST, 0));
+  add_tag(buffer, &buffer_pos, "title", mpd_song_get_tag(song, MPD_TAG_TITLE, 0));
+  add_tag(buffer, &buffer_pos, "track", mpd_song_get_tag(song, MPD_TAG_TRACK, 0));
+  add_tag(buffer, &buffer_pos, "name", mpd_song_get_tag(song, MPD_TAG_NAME, 0));
+  add_tag(buffer, &buffer_pos, "genre", mpd_song_get_tag(song, MPD_TAG_GENRE, 0));
+  add_tag(buffer, &buffer_pos, "date", mpd_song_get_tag(song, MPD_TAG_DATE, 0));
+  add_tag(buffer, &buffer_pos, "composer", mpd_song_get_tag(song, MPD_TAG_COMPOSER, 0));
+  add_tag(buffer, &buffer_pos, "performer", mpd_song_get_tag(song, MPD_TAG_PERFORMER, 0));
+  add_tag(buffer, &buffer_pos, "comment", mpd_song_get_tag(song, MPD_TAG_COMMENT, 0));
+  add_tag(buffer, &buffer_pos, "disc", mpd_song_get_tag(song, MPD_TAG_DISC, 0));
+  add_tag(buffer, &buffer_pos, "musicbrainz_artist_id", mpd_song_get_tag(song, MPD_TAG_MUSICBRAINZ_ARTISTID, 0));
+  add_tag(buffer, &buffer_pos, "musicbrainz_album_id", mpd_song_get_tag(song, MPD_TAG_MUSICBRAINZ_ALBUMID, 0));
+  add_tag(buffer, &buffer_pos, "musicbrainz_album_artist_id", mpd_song_get_tag(song, MPD_TAG_MUSICBRAINZ_ALBUMARTISTID, 0));
+  add_tag(buffer, &buffer_pos, "musicbrainz_track_id", mpd_song_get_tag(song, MPD_TAG_MUSICBRAINZ_TRACKID, 0));
+  add_tag(buffer, &buffer_pos, "musicbrainz_releasetrack_id", mpd_song_get_tag(song, MPD_TAG_MUSICBRAINZ_RELEASETRACKID, 0));
+  add_tag(buffer, &buffer_pos, "original_date", mpd_song_get_tag(song, MPD_TAG_ORIGINAL_DATE, 0));
+  add_tag(buffer, &buffer_pos, "artist_sort", mpd_song_get_tag(song, MPD_TAG_ARTIST_SORT, 0));
+  add_tag(buffer, &buffer_pos, "album_artist_sort", mpd_song_get_tag(song, MPD_TAG_ALBUM_ARTIST_SORT, 0));
+  add_tag(buffer, &buffer_pos, "album_sort", mpd_song_get_tag(song, MPD_TAG_ALBUM_SORT, 0));
+  add_tag(buffer, &buffer_pos, "label", mpd_song_get_tag(song, MPD_TAG_LABEL, 0));
+  add_tag(buffer, &buffer_pos, "musicbrainz_work_id", mpd_song_get_tag(song, MPD_TAG_MUSICBRAINZ_WORKID, 0));
+  add_tag(buffer, &buffer_pos, "grouping", mpd_song_get_tag(song, MPD_TAG_GROUPING, 0));
+  add_tag(buffer, &buffer_pos, "work", mpd_song_get_tag(song, MPD_TAG_WORK, 0));
+  add_tag(buffer, &buffer_pos, "conductor", mpd_song_get_tag(song, MPD_TAG_CONDUCTOR, 0));
+  add_tag(buffer, &buffer_pos, "count", mpd_song_get_tag(song, MPD_TAG_COUNT, 0));
 
-  if (title != NULL) {
-    char escaped_title[BUFFER_SIZE];
-    escape_json_string(title, escaped_title);
-    buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"title\":\"%s\",\n", escaped_title);
+  // Remove the trailing comma if any
+  if (buffer[buffer_pos - 1] == ',') {
+    buffer_pos--;
   }
 
-  if (artist != NULL) {
-    char escaped_artist[BUFFER_SIZE];
-    escape_json_string(artist, escaped_artist);
-    buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"artist\":\"%s\",\n", escaped_artist);
-  }
-
-  if (album != NULL) {
-    char escaped_album[BUFFER_SIZE];
-    escape_json_string(album, escaped_album);
-    buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"album\":\"%s\",\n", escaped_album);
-  }
-
-  if (genre != NULL) {
-    char escaped_genre[BUFFER_SIZE];
-    escape_json_string(genre, escaped_genre);
-    buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"genre\":\"%s\",\n", escaped_genre);
-  }
-
-  if (album_artist != NULL) {
-    char escaped_album_artist[BUFFER_SIZE];
-    escape_json_string(album_artist, escaped_album_artist);
-    buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"albumartist\":\"%s\",\n", escaped_album_artist);
-  }
-
-  // last key without, trailing comma
-  buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"duration\":%d\n", duration);
-  // close json object
   buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "}\n");
 
   printf("%s", buffer);
