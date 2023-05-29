@@ -46,35 +46,68 @@ void escape_json_string(const char* input, char* output) {
 }
 
 // Helper function to add a tag to the JSON output
-// Helper function to add a tag to the JSON output
 void add_tag(char* buffer, size_t* buffer_pos, const char* tag_name, const char* tag_value) {
-    if (tag_value != NULL) {
-        char escaped_value[BUFFER_SIZE];
-        escape_json_string(tag_value, escaped_value);
-        *buffer_pos += snprintf(buffer + *buffer_pos, BUFFER_SIZE - *buffer_pos, "\"%s\":\"%s\",", tag_name, escaped_value);
+  if (tag_value != NULL) {
+    char escaped_value[BUFFER_SIZE];
+    escape_json_string(tag_value, escaped_value);
+
+    // Check if tag_value is a number
+    char* endptr;
+    long long_value = strtol(tag_value, &endptr, 10);
+    if (*endptr == '\0') {
+      // tag_value is an int
+      *buffer_pos += snprintf(buffer + *buffer_pos, BUFFER_SIZE - *buffer_pos, "\"%s\":%ld,", tag_name, long_value);
+    } else {
+      // tag_value is a string
+      *buffer_pos += snprintf(buffer + *buffer_pos, BUFFER_SIZE - *buffer_pos, "\"%s\":\"%s\",", tag_name, escaped_value);
     }
+  }
 }
+
 
 int main(int argc, char* argv[]) {
   int port = 6600;
-  int verbose = 0;
-  const char* host = "localhost";
+  // int verbose = 0;
+  // const char* host = "localhost";
+  char* host = "localhost";
 
   // Command line argument parsing
   int opt;
-  while ((opt = getopt(argc, argv, "vp:")) != -1) {
+  int option_index = 0;
+  char* host_arg;
+
+  // Define the long options array
+  static struct option long_options[] = {
+    // {"verbose", no_argument, 0, 'v'},
+    {"port", required_argument, 0, 'p'},
+    {"host", required_argument, 0, 'h'},
+    {0, 0, 0, 0}
+  };
+
+  while ((opt = getopt_long(argc, argv, "vp:", long_options, &option_index)) != -1) {
     switch (opt) {
-    case 'v':
-      verbose = 1;
+    /* case 'v': */
+    /*   verbose = 1; */
+    /*   break; */
+    case 'h':
+      host_arg = (char*)malloc(strlen(optarg) + 1);
+      if (host_arg != NULL) {
+        strcpy(host_arg, host);
+      }
+      else {
+        fprintf(stderr, "ERROR: Memory allocation for host failed!\n");
+        exit(EXIT_FAILURE);
+      }
       break;
     case 'p':
       port = atoi(optarg);
       break;
     default:
-      fprintf(stderr, "Usage: %s [-v] [-p port]\n", argv[0]);
+      fprintf(stderr, "Usage: %s [-h,--host hostadress] [--port number]\n", argv[0]);
       exit(1);
     }
   }
+
 
   // Connect to MPD server
   struct mpd_connection* connection = mpd_connection_new(host, port, 0);
@@ -130,11 +163,45 @@ int main(int argc, char* argv[]) {
   add_tag(buffer, &buffer_pos, "conductor", mpd_song_get_tag(song, MPD_TAG_CONDUCTOR, 0));
   add_tag(buffer, &buffer_pos, "count", mpd_song_get_tag(song, MPD_TAG_COUNT, 0));
 
+  // Get current status
+  if (status != NULL) {
+    double elapsed = mpd_status_get_elapsed_ms(status) / 1000.0;
+    double duration = mpd_song_get_duration_ms(song) / 1000.0;
+
+    buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"elapsed\":%.3f,", elapsed);
+    buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"duration\":%.3f,", duration);
+    buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"position\":%u,", mpd_status_get_song_pos(status));
+    buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"playlist_length\":%u,", mpd_status_get_queue_length(status));
+    buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"repeat\":%s,", mpd_status_get_repeat(status) ? "true" : "false");
+    buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"random\":%s,", mpd_status_get_random(status) ? "true" : "false");
+    buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"single\":%s,", mpd_status_get_single(status) ? "true" : "false");
+    buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"consume\":%s,", mpd_status_get_consume(status) ? "true" : "false");
+    buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"bitrate\":%u,", mpd_status_get_kbit_rate(status));
+  }
+
+  // Convert the playback state to its string representation
+  const char* state_string;
+  switch (mpd_status_get_state(status)) {
+  case MPD_STATE_PLAY:
+    state_string = "play";
+    break;
+  case MPD_STATE_PAUSE:
+    state_string = "pause";
+    break;
+  case MPD_STATE_STOP:
+    state_string = "stop";
+    break;
+  default:
+    state_string = "unknown";
+    break;
+  }
+
+  buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "\"state\":\"%s\",", state_string);
+
   // Remove the trailing comma if any
   if (buffer[buffer_pos - 1] == ',') {
     buffer_pos--;
   }
-
   buffer_pos += snprintf(buffer + buffer_pos, BUFFER_SIZE - buffer_pos, "}\n");
 
   printf("%s", buffer);
@@ -143,6 +210,7 @@ int main(int argc, char* argv[]) {
   mpd_song_free(song);
   mpd_status_free(status);
   mpd_connection_free(connection);
+  free(host_arg);
 
   return 0;
 }
