@@ -4,6 +4,7 @@
 - DEPENDENCIES
   - =mpd=: should also provide the =libmpdclient= library for connecting
     to the C API.
+  - =glib2=: Low level core library
 
 Install with:
 : sudo make install
