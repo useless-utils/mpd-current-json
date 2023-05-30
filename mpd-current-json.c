@@ -104,7 +104,7 @@ int main(int argc, char* argv[]) {
       break;
     default:
       fprintf(stderr, "Usage: %s [-h,--host hostadress] [--port number]\n", argv[0]);
-      exit(1);
+      exit(EXIT_FAILURE);
     }
   }
 
@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
   struct mpd_connection* connection = mpd_connection_new(host, port, 0);
   if (connection == NULL) {
     fprintf(stderr, "Failed to connect to MPD server.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   // Send command and receive response
@@ -122,8 +122,9 @@ int main(int argc, char* argv[]) {
 
   if (song == NULL) {
     printf("{}\n");
-    mpd_status_free(status);
+    // Clean up
     mpd_connection_free(connection);
+    free(host_arg);
     return 0;
   }
 

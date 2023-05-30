@@ -1,12 +1,15 @@
 CC = gcc
-CFLAGS = -Wall -Wextra
-LDFLAGS = -lmpdclient
+CFLAGS = -Wall -Wextra $(shell pkg-config --cflags glib-2.0)
+LDFLAGS = $(shell pkg-config --libs glib-2.0) -lmpdclient
 
 TARGET = mpd-current-json
 SRCS = mpd-current-json.c
 OBJS = $(SRCS:.c=.o)
 
-.PHONY: all clean
+PREFIX ?= /usr/local
+BINDIR = $(PREFIX)/bin
+
+.PHONY: all clean install uninstall
 
 all: $(TARGET)
 
@@ -18,3 +21,10 @@ $(TARGET): $(OBJS)
 
 clean:
 	rm -f $(OBJS) $(TARGET)
+
+install: $(TARGET)
+	install -D -m 755 $(TARGET) $(BINDIR)/$(TARGET)
+
+uninstall:
+	rm -f $(BINDIR)/$(TARGET)
+
