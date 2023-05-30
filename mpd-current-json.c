@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
     {0, 0, 0, 0}
   };
 
-  while ((opt = getopt_long(argc, argv, "vp:", long_options, &option_index)) != -1) {
+  while ((opt = getopt_long(argc, argv, "h:p:", long_options, &option_index)) != -1) {
     switch (opt) {
     /* case 'v': */
     /*   verbose = 1; */
@@ -103,7 +103,7 @@ int main(int argc, char* argv[]) {
       port = atoi(optarg);
       break;
     default:
-      fprintf(stderr, "Usage: %s [-h,--host hostadress] [--port number]\n", argv[0]);
+      fprintf(stderr, "Usage: %s [-h,--host hostadress] [-p,--port number]\n", argv[0]);
       exit(EXIT_FAILURE);
     }
   }
