@@ -1,0 +1,6 @@
+#+TITLE: Revision history for mpd-current-json
+#+DATE: 2023-06-01 Thu 15:29:07 -03
+
+* 0.1.0.0 -- 2023-06-01
+- First version. Released on an unsuspecting world.
+
