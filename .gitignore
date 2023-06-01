@@ -1,2 +1,4 @@
 /mpd-current-json.o
 /mpd-current-json
+*/.trash/
+*/bin/
