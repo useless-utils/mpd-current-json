@@ -1,0 +1,107 @@
+* Files
+
+** Source
+*** Main.hs
+:PROPERTIES:
+:header-args:haskell: :tangle Main.hs
+:END:
+
+**** Imports
+Import for the ~libmpd~ library, added as ~libmpd == 0.10.*~ to
+[[*mpd-current-json.cabal][mpd-current-json.cabal]].
+#+begin_src haskell
+import Network.MPD
+#+end_src
+
+**** Main
+#+begin_src haskell
+main = do
+  s <- withMPD status
+  case s of
+    Left err -> putStrLn $ "ERROR: " ++ show err
+    Right s' -> do
+      printState (stState s')
+      printTime s'
+
+printTime :: Status -> IO ()
+printTime s =
+  case stTime s of
+    Just (elapsed, total) -> putStrLn $ "Time: \"" ++ show elapsed ++ "/" ++ show total ++ "\""
+    Nothing -> putStrLn "Time information not available"
+
+printState s =
+  case s of
+    Playing -> p "State: Playing"
+    Paused -> p "State: Paused"
+    Stopped -> p "State: Stopped"
+    where
+      p = putStrLn
+#+end_src
+
+
+** Extra
+*** CHANGELOG.org
+:PROPERTIES:
+:header-args:haskell: :tangle CHANGELOG.org
+:END:
+
+File to be tangled and include the [[*Changelog][Changelog]] heading.
+#+begin_src org :tangle CHANGELOG.org :exports none
+#+TITLE: Revision history for mpd-current-json
+#+DATE: 2023-06-01 Thu 15:29:07 -03
+#+INCLUDE: README.org::*Changelog
+#+OPTIONS: toc:nil prop:t date:nil timestamp:nil
+#+end_src
+
+*** mpd-current-json.cabal
+:PROPERTIES:
+:header-args:haskell-cabal: :tangle mpd-current-json.cabal
+:END:
+#+begin_src haskell-cabal
+cabal-version:      3.0
+name:               mpd-current-json
+version:            0.1.0.0
+synopsis:           Print current MPD song and status as json
+
+-- A longer description of the package.
+-- description:
+homepage:           https://codeberg.org/useless-utils/mpd-current-json
+
+-- A URL where users can report bugs.
+-- bug-reports:
+license:            Unlicense
+license-file:       UNLICENSE
+author:             Lucas G
+maintainer:         g@11xx.org
+
+-- A copyright notice.
+-- copyright:
+category:           Network
+extra-source-files: CHANGELOG.org
+
+executable mpd-current-json
+    main-is:          Main.hs
+
+    -- Modules included in this executable, other than Main.
+    -- other-modules:
+
+    -- LANGUAGE extensions used by modules in this package.
+    -- other-extensions:
+    build-depends:    base ^>=4.16.4.0
+                    , libmpd == 0.10.*
+
+    -- Directories containing source files.
+    -- hs-source-dirs:
+    default-language: Haskell2010
+
+#+end_src
+
+
+* Changelog
+** v0.1.0.0
+- 2023-06-02:
+  - initial connection and parsing values
+
+- 2023-06-01:
+  - First version. Released on an unsuspecting world.
+
