@@ -1,4 +1,4 @@
 #+TITLE: Revision history for mpd-current-json
 #+DATE: 2023-06-01 Thu 15:29:07 -03
 #+INCLUDE: README.org::*Changelog
-#+OPTIONS: toc:nil prop:t date:nil timestamp:nil
+#+OPTIONS: toc:nil prop:t date:nil timestamp:nil num:nil

@@ -1,9 +1,10 @@
+# #+PROPERTY: header-args :comments link
 * Files
 
 ** Source
 *** Main.hs
 :PROPERTIES:
-:header-args:haskell: :tangle Main.hs
+:header-args:haskell+: :tangle Main.hs
 :END:
 
 **** Imports
@@ -42,7 +43,7 @@ printState s =
 ** Extra
 *** CHANGELOG.org
 :PROPERTIES:
-:header-args:haskell: :tangle CHANGELOG.org
+:header-args:haskell+: :tangle CHANGELOG.org :comments link
 :END:
 
 File to be tangled and include the [[*Changelog][Changelog]] heading.
@@ -50,17 +51,24 @@ File to be tangled and include the [[*Changelog][Changelog]] heading.
 #+TITLE: Revision history for mpd-current-json
 #+DATE: 2023-06-01 Thu 15:29:07 -03
 #+INCLUDE: README.org::*Changelog
-#+OPTIONS: toc:nil prop:t date:nil timestamp:nil
+#+OPTIONS: toc:nil prop:t date:nil timestamp:nil num:nil
 #+end_src
 
 *** mpd-current-json.cabal
 :PROPERTIES:
-:header-args:haskell-cabal: :tangle mpd-current-json.cabal
+:header-args:haskell-cabal+: :tangle mpd-current-json.cabal :comments none
 :END:
 #+begin_src haskell-cabal
 cabal-version:      3.0
 name:               mpd-current-json
-version:            0.1.0.0
+-- The package version.
+-- See the Haskell package versioning policy (PVP) for standards
+-- guiding when and how versions should be incremented.
+-- https://pvp.haskell.org
+-- PVP summary:     +-+------- breaking API changes
+--                  | | +----- non-breaking API additions
+--                  | | | +--- code changes with no API change
+version:            0.0.1.0
 synopsis:           Print current MPD song and status as json
 
 -- A longer description of the package.
@@ -89,16 +97,17 @@ executable mpd-current-json
     -- other-extensions:
     build-depends:    base ^>=4.16.4.0
                     , libmpd == 0.10.*
+                    , optparse-applicative == 0.18.*
+                    , aeson == 2.1.*
 
     -- Directories containing source files.
     -- hs-source-dirs:
     default-language: Haskell2010
-
 #+end_src
 
 
 * Changelog
-** v0.1.0.0
+** v0.0.1.0
 - 2023-06-02:
   - initial connection and parsing values
 

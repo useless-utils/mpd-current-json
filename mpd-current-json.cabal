@@ -1,6 +1,13 @@
 cabal-version:      3.0
 name:               mpd-current-json
-version:            0.1.0.0
+-- The package version.
+-- See the Haskell package versioning policy (PVP) for standards
+-- guiding when and how versions should be incremented.
+-- https://pvp.haskell.org
+-- PVP summary:     +-+------- breaking API changes
+--                  | | +----- non-breaking API additions
+--                  | | | +--- code changes with no API change
+version:            0.0.1.0
 synopsis:           Print current MPD song and status as json
 
 -- A longer description of the package.
@@ -29,6 +36,8 @@ executable mpd-current-json
     -- other-extensions:
     build-depends:    base ^>=4.16.4.0
                     , libmpd == 0.10.*
+                    , optparse-applicative == 0.18.*
+                    , aeson == 2.1.*
 
     -- Directories containing source files.
     -- hs-source-dirs:
