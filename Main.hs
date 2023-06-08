@@ -8,11 +8,13 @@ import Data.Aeson ( object, Key, KeyValue(..), ToJSON )
 import Data.Aeson.Encode.Pretty ( encodePretty )
 import qualified Data.ByteString.Lazy.Char8 as C
 import Text.Printf ( printf )
+import Options
 
 main :: IO ()
 main = do
-  currSong <- MPD.withMPD MPD.currentSong
-  currStatus <- MPD.withMPD MPD.status
+  opts <- customExecParser (prefs showHelpOnEmpty) optsParserInfo
+  currSong <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.currentSong
+  currStatus <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.status
   let st = currStatus
   let cs = currSong
   let artist                     = getTag Artist                     cs
@@ -35,22 +37,21 @@ main = do
       comment                    = getTag Comment                    cs
       disc                       = getTag Disc                       cs
       label                      = getTag Label                      cs
-      musicbrainz_artistid       = getTag MUSICBRAINZ_ARTISTID       cs
-      musicbrainz_albumid        = getTag MUSICBRAINZ_ALBUMID        cs
-      musicbrainz_albumartistid  = getTag MUSICBRAINZ_ALBUMARTISTID  cs
-      musicbrainz_trackid        = getTag MUSICBRAINZ_TRACKID        cs
-      musicbrainz_releasetrackid = getTag MUSICBRAINZ_RELEASETRACKID cs
-      musicbrainz_workid         = getTag MUSICBRAINZ_WORKID         cs
+      musicbrainz_Artistid       = getTag MUSICBRAINZ_ARTISTID       cs
+      musicbrainz_Albumid        = getTag MUSICBRAINZ_ALBUMID        cs
+      musicbrainz_Albumartistid  = getTag MUSICBRAINZ_ALBUMARTISTID  cs
+      musicbrainz_Trackid        = getTag MUSICBRAINZ_TRACKID        cs
+      musicbrainz_Releasetrackid = getTag MUSICBRAINZ_RELEASETRACKID cs
+      musicbrainz_Workid         = getTag MUSICBRAINZ_WORKID         cs
 
   let state :: Maybe String
       state = case getStatusItem st MPD.stState of
                 Just ps -> case ps of
                              Playing -> Just "play"  -- same as mpc
-                             Paused -> Just "pause"  -- same as mpc
+                             Paused  -> Just "pause"  -- same as mpc
                              Stopped -> Just "stopped"
                 Nothing -> Nothing
 
-      repeat' = getStatusItem st MPD.stRepeat
       time = getStatusItem st MPD.stTime
 
       elapsed = case time of
@@ -65,12 +66,22 @@ main = do
                     _ -> Nothing
         Nothing -> Nothing
 
-      elapsed_percent :: Maybe Double
-      elapsed_percent = case time of
+      elapsedPercent :: Maybe Double
+      elapsedPercent = case time of
         Just t -> case t of
                     Just t1 -> Just (read $ printf "%.2f" (uncurry (/) t1 * 100))
                     Nothing -> Just 0
         Nothing -> Nothing
+
+      repeatSt = getStatusItem st MPD.stRepeat
+      randomSt = getStatusItem st MPD.stRandom
+      singleSt = getStatusItem st MPD.stSingle
+      consumeSt = getStatusItem st MPD.stConsume
+      pos = getStatusItem st MPD.stSongPos
+      playlistLength = getStatusItem st MPD.stPlaylistLength
+      bitrate = getStatusItem st MPD.stBitrate
+      audioFormat = getStatusItem st MPD.stAudio
+      errorSt = getStatusItem st MPD.stError
 
   let jTags = object . catMaybes $
         [ "artist"                     .=? artist
@@ -93,26 +104,34 @@ main = do
         , "comment"                    .=? comment
         , "disc"                       .=? disc
         , "label"                      .=? label
-        , "musicbrainz_artistid"       .=? musicbrainz_artistid
-        , "musicbrainz_albumid"        .=? musicbrainz_albumid
-        , "musicbrainz_albumartistid"  .=? musicbrainz_albumartistid
-        , "musicbrainz_trackid"        .=? musicbrainz_trackid
-        , "musicbrainz_releasetrackid" .=? musicbrainz_releasetrackid
-        , "musicbrainz_workid"         .=? musicbrainz_workid
+        , "musicbrainz_artistid"       .=? musicbrainz_Artistid
+        , "musicbrainz_albumid"        .=? musicbrainz_Albumid
+        , "musicbrainz_albumartistid"  .=? musicbrainz_Albumartistid
+        , "musicbrainz_trackid"        .=? musicbrainz_Trackid
+        , "musicbrainz_releasetrackid" .=? musicbrainz_Releasetrackid
+        , "musicbrainz_workid"         .=? musicbrainz_Workid
         ]
 
   let jStatus = object . catMaybes $
         [ "state"                      .=? state
-        , "repeat"                     .=? repeat'
+        , "repeat"                     .=? repeatSt
         , "elapsed" .=? elapsed
         , "duration" .=? duration
-        , "elapsed_pencent" .=? elapsed_percent
+        , "elapsed_percent" .=? elapsedPercent
+        , "random" .=? randomSt
+        , "single" .=? singleSt
+        , "consume" .=? consumeSt
+        , "song_position" .=? pos
+        , "playlist_length" .=? playlistLength
+        , "bitrate" .=? bitrate
+        , "audio_format" .=? audioFormat
+        , "error" .=? errorSt
         ]
 
   let jObject = object [ "tags" .= jTags
-                   , "status" .= jStatus ]
+                       , "status" .= jStatus ]
+
   C.putStrLn $ encodePretty jObject
-  -- putStrLn $ show state
 
 getTag :: Metadata -> Either a (Maybe Song) -> Maybe String
 getTag t c =
@@ -143,4 +162,3 @@ valueToStringMay x = Just (MPD.toString x)
 (.=?) :: (KeyValue a, ToJSON v) => Key -> Maybe v -> Maybe a
 key .=? Just value = Just (key .= value)
 _   .=? Nothing    = Nothing
-

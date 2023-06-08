@@ -6,37 +6,290 @@
 :PROPERTIES:
 :header-args:haskell+: :tangle Main.hs
 :END:
-
+**** Pragma language extensions
+#+begin_src haskell
+{-# LANGUAGE OverloadedStrings #-}
+#+end_src
 **** Imports
 Import for the ~libmpd~ library, added as ~libmpd == 0.10.*~ to
 [[*mpd-current-json.cabal][mpd-current-json.cabal]].
 #+begin_src haskell
+import qualified Network.MPD as MPD
 import Network.MPD
+    ( Metadata(..), Song, PlaybackState(Stopped, Playing, Paused) )
+import Data.Maybe ( catMaybes )
+import Data.Aeson ( object, Key, KeyValue(..), ToJSON )
+import Data.Aeson.Encode.Pretty ( encodePretty )
+import qualified Data.ByteString.Lazy.Char8 as C
+import Text.Printf ( printf )
+import Options
 #+end_src
 
 **** Main
 #+begin_src haskell
+main :: IO ()
 main = do
-  s <- withMPD status
-  case s of
-    Left err -> putStrLn $ "ERROR: " ++ show err
-    Right s' -> do
-      printState (stState s')
-      printTime s'
+  opts <- customExecParser (prefs showHelpOnEmpty) optsParserInfo
+  currSong <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.currentSong
+  currStatus <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.status
+  let st = currStatus
+  let cs = currSong
+  let artist                     = getTag Artist                     cs
+      artistSort                 = getTag ArtistSort                 cs
+      album                      = getTag Album                      cs
+      albumSort                  = getTag AlbumSort                  cs
+      albumArtist                = getTag AlbumArtist                cs
+      albumArtistSort            = getTag AlbumArtistSort            cs
+      title                      = getTag Title                      cs
+      track                      = getTag Track                      cs
+      name                       = getTag Name                       cs
+      genre                      = getTag Genre                      cs
+      date                       = getTag Date                       cs
+      originalDate               = getTag OriginalDate               cs
+      composer                   = getTag Composer                   cs
+      performer                  = getTag Performer                  cs
+      conductor                  = getTag Conductor                  cs
+      work                       = getTag Work                       cs
+      grouping                   = getTag Grouping                   cs
+      comment                    = getTag Comment                    cs
+      disc                       = getTag Disc                       cs
+      label                      = getTag Label                      cs
+      musicbrainz_Artistid       = getTag MUSICBRAINZ_ARTISTID       cs
+      musicbrainz_Albumid        = getTag MUSICBRAINZ_ALBUMID        cs
+      musicbrainz_Albumartistid  = getTag MUSICBRAINZ_ALBUMARTISTID  cs
+      musicbrainz_Trackid        = getTag MUSICBRAINZ_TRACKID        cs
+      musicbrainz_Releasetrackid = getTag MUSICBRAINZ_RELEASETRACKID cs
+      musicbrainz_Workid         = getTag MUSICBRAINZ_WORKID         cs
 
-printTime :: Status -> IO ()
-printTime s =
-  case stTime s of
-    Just (elapsed, total) -> putStrLn $ "Time: \"" ++ show elapsed ++ "/" ++ show total ++ "\""
-    Nothing -> putStrLn "Time information not available"
+  let state :: Maybe String
+      state = case getStatusItem st MPD.stState of
+                Just ps -> case ps of
+                             Playing -> Just "play"  -- same as mpc
+                             Paused  -> Just "pause"  -- same as mpc
+                             Stopped -> Just "stopped"
+                Nothing -> Nothing
 
-printState s =
-  case s of
-    Playing -> p "State: Playing"
-    Paused -> p "State: Paused"
-    Stopped -> p "State: Stopped"
-    where
-      p = putStrLn
+      time = getStatusItem st MPD.stTime
+
+      elapsed = case time of
+        Just t -> case t of
+                    Just (e, _) -> Just e
+                    _ -> Nothing
+        Nothing -> Nothing
+
+      duration = case time of
+        Just t -> case t of
+                    Just (_, d) -> Just d
+                    _ -> Nothing
+        Nothing -> Nothing
+
+      elapsedPercent :: Maybe Double
+      elapsedPercent = case time of
+        Just t -> case t of
+                    Just t1 -> Just (read $ printf "%.2f" (uncurry (/) t1 * 100))
+                    Nothing -> Just 0
+        Nothing -> Nothing
+
+      repeatSt = getStatusItem st MPD.stRepeat
+      randomSt = getStatusItem st MPD.stRandom
+      singleSt = getStatusItem st MPD.stSingle
+      consumeSt = getStatusItem st MPD.stConsume
+      pos = getStatusItem st MPD.stSongPos
+      playlistLength = getStatusItem st MPD.stPlaylistLength
+      bitrate = getStatusItem st MPD.stBitrate
+      audioFormat = getStatusItem st MPD.stAudio
+      errorSt = getStatusItem st MPD.stError
+
+  let jTags = object . catMaybes $
+        [ "artist"                     .=? artist
+        , "artist_sort"                .=? artistSort
+        , "album"                      .=? album
+        , "album_sort"                 .=? albumSort
+        , "album_artist"               .=? albumArtist
+        , "album_artist_sort"          .=? albumArtistSort
+        , "title"                      .=? title
+        , "track"                      .=? track
+        , "name"                       .=? name
+        , "genre"                      .=? genre
+        , "date"                       .=? date
+        , "original_date"              .=? originalDate
+        , "composer"                   .=? composer
+        , "performer"                  .=? performer
+        , "conductor"                  .=? conductor
+        , "work"                       .=? work
+        , "grouping"                   .=? grouping
+        , "comment"                    .=? comment
+        , "disc"                       .=? disc
+        , "label"                      .=? label
+        , "musicbrainz_artistid"       .=? musicbrainz_Artistid
+        , "musicbrainz_albumid"        .=? musicbrainz_Albumid
+        , "musicbrainz_albumartistid"  .=? musicbrainz_Albumartistid
+        , "musicbrainz_trackid"        .=? musicbrainz_Trackid
+        , "musicbrainz_releasetrackid" .=? musicbrainz_Releasetrackid
+        , "musicbrainz_workid"         .=? musicbrainz_Workid
+        ]
+
+  let jStatus = object . catMaybes $
+        [ "state"                      .=? state
+        , "repeat"                     .=? repeatSt
+        , "elapsed" .=? elapsed
+        , "duration" .=? duration
+        , "elapsed_percent" .=? elapsedPercent
+        , "random" .=? randomSt
+        , "single" .=? singleSt
+        , "consume" .=? consumeSt
+        , "song_position" .=? pos
+        , "playlist_length" .=? playlistLength
+        , "bitrate" .=? bitrate
+        , "audio_format" .=? audioFormat
+        , "error" .=? errorSt
+        ]
+
+  let jObject = object [ "tags" .= jTags
+                       , "status" .= jStatus ]
+
+  C.putStrLn $ encodePretty jObject
+
+getTag :: Metadata -> Either a (Maybe Song) -> Maybe String
+getTag t c =
+  case c of
+    Left _ -> Nothing
+    Right song -> processSong t song
+
+getStatusItem :: Either MPD.MPDError MPD.Status -> (MPD.Status -> a) -> Maybe a
+getStatusItem (Right st) f = Just (f st)
+getStatusItem _ _ = Nothing
+
+processSong :: Metadata -> Maybe Song -> Maybe String
+processSong _ Nothing = Nothing
+processSong tag (Just song) = do
+  let tagVal = MPD.sgGetTag tag song
+  valueToStringMay =<< (headMay =<< tagVal)
+
+-- Utility function to safely get the head of a list
+headMay :: [a] -> Maybe a
+headMay []    = Nothing
+headMay (x:_) = Just x
+
+-- Utility function to convert Value to String within a Maybe context
+valueToStringMay :: MPD.Value -> Maybe String
+valueToStringMay x = Just (MPD.toString x)
+
+-- Utility function to define optional fields
+(.=?) :: (KeyValue a, ToJSON v) => Key -> Maybe v -> Maybe a
+key .=? Just value = Just (key .= value)
+_   .=? Nothing    = Nothing
+#+end_src
+
+*** Options.hs
+:PROPERTIES:
+:header-args:haskell+: :tangle Options.hs
+:END:
+#+begin_src haskell
+module Options
+  ( Opts(..)
+  , customExecParser
+  , prefs
+  , showHelpOnEmpty
+  , optsParser
+  , optsParserInfo ) where
+
+import Options.Applicative
+    ( (<**>),
+      auto,
+      fullDesc,
+      header,
+      help,
+      info,
+      long,
+      metavar,
+      option,
+      strOption,
+      prefs,
+      progDesc,
+      short,
+      showHelpOnEmpty,
+      value,
+      customExecParser,
+      helper,
+      Parser,
+      ParserInfo,
+      infoOption )
+
+import Version ( versionStr )
+import Data.Kind (Type)
+
+data Opts = Opts
+  { optPort :: Integer
+  , optHost :: String
+  , optPass :: String
+  , optVersion :: Type -> Type
+  }
+
+optsParser :: Parser Opts
+optsParser
+  = Opts
+  <$> portOptParser
+  <*> hostOptParser
+  <*> passOptParser
+  <*> versionOptParse
+
+  where
+    portOptParser
+      = option auto
+      $ long "port"
+      <> short 'p'
+      <> metavar "PORTNUM"
+      <> value 6600
+      <> help "Port number"
+
+    hostOptParser
+      = strOption
+      $ metavar "ADDRESS"
+      <> long "host"
+      <> short 'H'
+      <> value "localhost"
+      <> help "Host address"
+
+    passOptParser
+      = option auto
+      $ metavar "PASSWORD"
+      <> long "password"
+      <> short 'P'
+      <> value ""
+      <> help "Password for connecting (will be sent as plain text)"
+
+versionOptParse :: Parser (a -> a)
+versionOptParse =
+  infoOption versionStr
+  $ long "version"
+  <> short 'V'
+  <> help "Display the version number"
+
+optsParserInfo :: ParserInfo Opts
+optsParserInfo = info (optsParser <**> helper)
+  $ fullDesc
+  <> progDesc "progdesc"
+  <> header "header desc"
+
+#+end_src
+
+*** Version.hs
+:PROPERTIES:
+:header-args:haskell+: :tangle Version.hs
+:END:
+#+begin_src haskell
+module Version (versionStr) where
+
+import Data.Version (showVersion)
+
+import Paths_mpd_current_json (version) -- generated by Cabal
+
+progName :: [Char]
+progName = "mpd-current-json"
+
+versionStr :: [Char]
+versionStr = progName ++ " version " ++ (showVersion version)
 #+end_src
 
 
@@ -68,7 +321,7 @@ name:               mpd-current-json
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            0.0.1.0
+version:            1.0.0.0
 synopsis:           Print current MPD song and status as json
 
 -- A longer description of the package.
@@ -91,7 +344,9 @@ executable mpd-current-json
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
-    -- other-modules:
+    other-modules:    Options
+                      Paths_mpd_current_json
+                      Version
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -99,14 +354,41 @@ executable mpd-current-json
                     , libmpd == 0.10.*
                     , optparse-applicative == 0.18.*
                     , aeson == 2.1.*
+                    , bytestring == 0.11.*
+                    , aeson-pretty == 0.8.*
 
     -- Directories containing source files.
     -- hs-source-dirs:
     default-language: Haskell2010
+
+    -- [[https://kowainik.github.io/posts/2019-02-06-style-guide#ghc-options][Haskell Style Guide :: Kowainik]]
+    ghc-options:    -Wall
+                    -Wcompat
+                    -Widentities
+                    -Wincomplete-uni-patterns
+                    -Wincomplete-record-updates
+                    -Wredundant-constraints
+                    -Wmissing-export-lists
+                    -Wpartial-fields
+                    -Wmissing-deriving-strategies
+                    -Wunused-packages
+                    -fwrite-ide-info
+                    -hiedir=.hie
+                    -O2 -fprof-auto -fprof-cafs
+
 #+end_src
 
 
 * Changelog
+
+** v1.0.0.o
+- 2023-06-08:
+  Initial working version
+  + Added conditional tags printing, only non-empty values are printed
+  + Accept host, port and password
+  + Nested json objects for `status' and `tags'
+  + Added elapsed_percent key shortcut for `elapsed / duration * 100'
+
 ** v0.0.1.0
 - 2023-06-02:
   - initial connection and parsing values

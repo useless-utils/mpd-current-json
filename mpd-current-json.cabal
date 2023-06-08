@@ -7,7 +7,7 @@ name:               mpd-current-json
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            0.0.1.0
+version:            1.0.0.0
 synopsis:           Print current MPD song and status as json
 
 -- A longer description of the package.
@@ -30,7 +30,9 @@ executable mpd-current-json
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
-    -- other-modules:
+    other-modules:    Options
+                      Paths_mpd_current_json
+                      Version
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -58,4 +60,4 @@ executable mpd-current-json
                     -Wunused-packages
                     -fwrite-ide-info
                     -hiedir=.hie
-
+                    -O2 -fprof-auto -fprof-cafs
