@@ -28,7 +28,7 @@ import Options.Applicative
       ParserInfo,
       infoOption )
 
-import Version ( versionStr )
+import Version ( versionStr, progName )
 import Data.Kind (Type)
 
 data Opts = Opts
@@ -81,5 +81,5 @@ versionOptParse =
 optsParserInfo :: ParserInfo Opts
 optsParserInfo = info (optsParser <**> helper)
   $ fullDesc
-  <> progDesc "progdesc"
-  <> header "header desc"
+  <> progDesc "Print currently playing song information as JSON"
+  <> header (progName ++ " - " ++ "Current MPD song information as JSON")

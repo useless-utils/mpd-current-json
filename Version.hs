@@ -1,4 +1,5 @@
-module Version (versionStr) where
+module Version ( versionStr,
+                 progName ) where
 
 import Data.Version (showVersion)
 
