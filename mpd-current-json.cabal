@@ -60,4 +60,4 @@ executable mpd-current-json
                     -Wunused-packages
                     -fwrite-ide-info
                     -hiedir=.hie
-                    -O2 -fprof-auto -fprof-cafs
+                    -fprof-auto -fprof-cafs

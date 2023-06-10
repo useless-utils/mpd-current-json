@@ -23,17 +23,37 @@ import Data.Aeson.Encode.Pretty ( encodePretty )
 import qualified Data.ByteString.Lazy.Char8 as C
 import Text.Printf ( printf )
 import Options
+
 #+end_src
 
 **** Main
+:PROPERTIES:
+:header-args:haskell+: :padline no
+:END:
 #+begin_src haskell
 main :: IO ()
 main = do
-  opts <- customExecParser (prefs showHelpOnEmpty) optsParserInfo
-  currSong <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.currentSong
-  currStatus <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.status
-  let st = currStatus
-  let cs = currSong
+#+end_src
+
+Parse the command-line options and bind the result to =opts=.
+#+begin_src haskell
+  opts <- execParser optsParserInfo
+#+end_src
+
+Connect to MPD using either provided values using command-line
+arguments or the default values, as defined in [[*=Parser Opts= definition][​=Parser Opts= definition]].
+#+begin_src haskell
+  cs <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.currentSong
+  st <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.status
+#+end_src
+where =currentSong= returns a =Maybe (Just (Song {...}))= and =status=
+returns =Maybe (Status {...})= to be parsed.
+
+The data record =Song= from the command =currentSong= contains a field
+label "=sgTags=" that contains all embedded metadata tags in a =fromList
+[...]=, in this =let= statement store the parser =getTag= function calls to
+be placed in the JSON object later:
+#+begin_src haskell
   let artist                     = getTag Artist                     cs
       artistSort                 = getTag ArtistSort                 cs
       album                      = getTag Album                      cs
@@ -60,7 +80,12 @@ main = do
       musicbrainz_Trackid        = getTag MUSICBRAINZ_TRACKID        cs
       musicbrainz_Releasetrackid = getTag MUSICBRAINZ_RELEASETRACKID cs
       musicbrainz_Workid         = getTag MUSICBRAINZ_WORKID         cs
+#+end_src
 
+Likewise, =getStatusItem= parses values from =Status {...}= returned by
+=status=, some may require additional =Maybe= checks to get the desired
+values.
+#+begin_src haskell
   let state :: Maybe String
       state = case getStatusItem st MPD.stState of
                 Just ps -> case ps of
@@ -99,7 +124,26 @@ main = do
       bitrate = getStatusItem st MPD.stBitrate
       audioFormat = getStatusItem st MPD.stAudio
       errorSt = getStatusItem st MPD.stError
+#+end_src
 
+# Create the first JSON object that contains all the extracted =sgTags=
+# values. To prevent printing fields that contain no value to the final
+# JSON object (e.g. ="key":null=), the custom operator ~.=?~ is used to
+# check if the assined =getTag= or =getStatusItem= functions returned
+# "=Nothing=", if so, also send =Nothing= as the value of the key/value
+# pair, then, in conjunction with =catMaybes= filter out empty values and
+# extract only the values from =Just=, returning the raw value.
+
+The =object . catMaybes= constructs a JSON object by combining a list of
+key/value pairs. The ~.=?~ operator is used to create each key/value
+pair. If the value is =Just=, the key/value pair is included in the
+list; if the value is =Nothing=, it is filtered out using =catMaybes= to
+prevent generating fields with a value of =null= in the final JSON
+object. Then, the =object= function converts the list of key/value
+pairs into an =Object= data structure that can be 'encoded' using
+=Data.Aeson='s "=encode=" or =Data.Aeson.Encode.Pretty='s "=encodePretty=".
+#+begin_src haskell
+  -- sgTags
   let jTags = object . catMaybes $
         [ "artist"                     .=? artist
         , "artist_sort"                .=? artistSort
@@ -129,52 +173,122 @@ main = do
         , "musicbrainz_workid"         .=? musicbrainz_Workid
         ]
 
+  -- status
   let jStatus = object . catMaybes $
-        [ "state"                      .=? state
-        , "repeat"                     .=? repeatSt
-        , "elapsed" .=? elapsed
-        , "duration" .=? duration
+        [ "state"           .=? state
+        , "repeat"          .=? repeatSt
+        , "elapsed"         .=? elapsed
+        , "duration"        .=? duration
         , "elapsed_percent" .=? elapsedPercent
-        , "random" .=? randomSt
-        , "single" .=? singleSt
-        , "consume" .=? consumeSt
-        , "song_position" .=? pos
+        , "random"          .=? randomSt
+        , "single"          .=? singleSt
+        , "consume"         .=? consumeSt
+        , "song_position"   .=? pos
         , "playlist_length" .=? playlistLength
-        , "bitrate" .=? bitrate
-        , "audio_format" .=? audioFormat
-        , "error" .=? errorSt
+        , "bitrate"         .=? bitrate
+        , "audio_format"    .=? audioFormat
+        , "error"           .=? errorSt
         ]
+#+end_src
 
+Having two objects, one for "tags" and other for "status", create a
+nested JSON with labels before each of them.
+#+begin_src haskell
   let jObject = object [ "tags" .= jTags
                        , "status" .= jStatus ]
+#+end_src
+e.g. so they can be parsed as "=.tags.title=" or
+"=.status.elapsed_percent=".
 
+Finally, encode it to real JSON and print it to the
+terminal. =Data.Aeson='s encoding is returned as a =ByteString= so use the
+=Data.ByteString...= import that provides an implementation of =putStrLn=
+that supports =ByteString=​s.
+#+begin_src haskell
   C.putStrLn $ encodePretty jObject
 
+#+end_src
+
+***** Utility Functions
+# ChatGPT descriptions
+
+# Return =Just (f st)= where =f= is a field label and =st= is the =(Response
+# Status)= from =withMPD* status=.
+
+The =getStatusItem= function takes an =Either MPD.MPDError MPD.Status=
+value and a field label function =f= as arguments. It returns
+=Just (f st)= if the input status is =Right st=, where =st= is the
+=MPD.Status= value. This function allows you to extract a specific field
+from the status by providing the corresponding field label function. If
+the input status is not =Right st=, indicating an error, or the field
+label function is not applicable, it returns =Nothing=.
+#+begin_src haskell
+getStatusItem :: Either MPD.MPDError MPD.Status -> (MPD.Status -> a) -> Maybe a
+getStatusItem (Right st) f = Just (f st)
+getStatusItem _ _ = Nothing
+#+end_src
+
+# Check if =Maybe Song= is not empty and send it to =processSong=
+The =getTag= function takes a metadata type =t= and an =Either= value
+=c= containing a =Maybe Song=. It checks if the =Either= value is
+=Left _=, indicating an error, and returns =Nothing=. If the =Either=
+value is =Right song=, it calls the =processSong= function with the
+metadata type =t= and the =Just song= value, which extracts the tag
+value from the song. The =getTag= function allows you to retrieve a
+specific tag value from the song if it exists.
+#+begin_src haskell
 getTag :: Metadata -> Either a (Maybe Song) -> Maybe String
 getTag t c =
   case c of
     Left _ -> Nothing
     Right song -> processSong t song
+#+end_src
 
-getStatusItem :: Either MPD.MPDError MPD.Status -> (MPD.Status -> a) -> Maybe a
-getStatusItem (Right st) f = Just (f st)
-getStatusItem _ _ = Nothing
-
+The =processSong= function takes a metadata type =tag= and a
+=Maybe Song=. If the =Maybe Song= value is =Nothing=, indicating an
+empty value, it returns =Nothing=. If the =Maybe Song= value is
+=Just song=, it retrieves the tag value using the =MPD.sgGetTag=
+function with the provided metadata type and song. It then applies the
+=headMay= function to extract the first element from the list of tag
+values and the =valueToStringMay= function to convert the value to a
+string within a =Maybe= context. This function allows you to process the
+tag values of a song and convert them to strings if they exist.
+#+begin_src haskell
 processSong :: Metadata -> Maybe Song -> Maybe String
 processSong _ Nothing = Nothing
 processSong tag (Just song) = do
   let tagVal = MPD.sgGetTag tag song
   valueToStringMay =<< (headMay =<< tagVal)
+#+end_src
 
+The =headMay= function is a utility function that safely gets the head
+of a list. It takes a list as input and returns =Nothing= if the list is
+empty or =Just x= where =x= is the first element of the list.
+#+begin_src haskell
 -- Utility function to safely get the head of a list
 headMay :: [a] -> Maybe a
 headMay []    = Nothing
 headMay (x:_) = Just x
+#+end_src
 
+The =valueToStringMay= function is a utility function that converts a
+=MPD.Value= to a =String= within a =Maybe= context. It takes a
+=MPD.Value= as input and returns =Just (MPD.toString x)= where =x= is
+the input value converted to a string.
+#+begin_src haskell
 -- Utility function to convert Value to String within a Maybe context
 valueToStringMay :: MPD.Value -> Maybe String
 valueToStringMay x = Just (MPD.toString x)
+#+end_src
 
+The ~.=?~ operator is a utility function to define optional fields in
+the key-value pairs of a JSON object. It takes a =Key= and a =Maybe=
+value =v= as input. If the =Maybe= value is =Just value=, it returns
+~Just (key .= value)~, where =key= is the input key and =value= is the
+input value. If the =Maybe= value is =Nothing=, it returns =Nothing=.
+This operator allows you to conditionally include or exclude fields in
+the JSON object based on the presence or absence of values.
+#+begin_src haskell
 -- Utility function to define optional fields
 (.=?) :: (KeyValue a, ToJSON v) => Key -> Maybe v -> Maybe a
 key .=? Just value = Just (key .= value)
@@ -188,7 +302,7 @@ _   .=? Nothing    = Nothing
 #+begin_src haskell
 module Options
   ( Opts(..)
-  , customExecParser
+  , execParser
   , prefs
   , showHelpOnEmpty
   , optsParser
@@ -210,7 +324,7 @@ import Options.Applicative
       short,
       showHelpOnEmpty,
       value,
-      customExecParser,
+      execParser,
       helper,
       Parser,
       ParserInfo,
@@ -219,13 +333,26 @@ import Options.Applicative
 import Version ( versionStr, progName )
 import Data.Kind (Type)
 
+#+end_src
+
+**** Data record for holding parsed 'Parser' values
+#+begin_src haskell
 data Opts = Opts
-  { optPort :: Integer
-  , optHost :: String
-  , optPass :: String
+  { optPort    :: Integer
+  , optHost    :: String
+  , optPass    :: String
   , optVersion :: Type -> Type
   }
+#+end_src
 
+**** =Parser Opts= definition
+#+begin_quote
+A [[https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#t:Parser][Parser]] a is an option parser returning a value of type a.
+#+end_quote
+
+Specify how =Options.Applicative= should parse arguments. Their returned
+values are stored in the custom defined data record =Opts=.
+#+begin_src haskell
 optsParser :: Parser Opts
 optsParser
   = Opts
@@ -233,8 +360,8 @@ optsParser
   <*> hostOptParser
   <*> passOptParser
   <*> versionOptParse
-
   where
+    portOptParser :: Parser Integer
     portOptParser
       = option auto
       $ long "port"
@@ -243,6 +370,7 @@ optsParser
       <> value 6600
       <> help "Port number"
 
+    -- hostOptParser :: Parser String
     hostOptParser
       = strOption
       $ metavar "ADDRESS"
@@ -251,6 +379,7 @@ optsParser
       <> value "localhost"
       <> help "Host address"
 
+    -- passOptParser :: Parser String
     passOptParser
       = option auto
       $ metavar "PASSWORD"
@@ -259,13 +388,28 @@ optsParser
       <> value ""
       <> help "Password for connecting (will be sent as plain text)"
 
-versionOptParse :: Parser (a -> a)
-versionOptParse =
-  infoOption versionStr
-  $ long "version"
-  <> short 'V'
-  <> help "Display the version number"
+    -- versionOptParse :: Parser (a -> a)
+    versionOptParse =
+      infoOption versionStr
+      $ long "version"
+      <> short 'V'
+      <> help "Display the version number"
+#+end_src
 
+**** Create ParserInfo
+
+#+begin_quote
+A [[https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#t:ParserInfo][ParserInfo]] describes a command line program, used to generate a help
+screen.
+--- [[https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#g:8][Options.Applicative]]
+#+end_quote
+
+- =optsParserInfo=
+
+  Utility function for =Options.Applicative='s "=info=" that create a
+  =ParserInfo= given a [[https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#t:Parser][​=Parser=​]] and a modifier, where =Parser=​s are defined
+  using a [[*Data record for holding parsed 'Parser' values][​custom data record​]].
+#+begin_src haskell
 optsParserInfo :: ParserInfo Opts
 optsParserInfo = info (optsParser <**> helper)
   $ fullDesc
@@ -375,7 +519,7 @@ executable mpd-current-json
                     -Wunused-packages
                     -fwrite-ide-info
                     -hiedir=.hie
-                    -O2 -fprof-auto -fprof-cafs
+                    -fprof-auto -fprof-cafs
 
 #+end_src
 
