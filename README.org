@@ -12,9 +12,12 @@ or to install to =${CABAL_DIR}/bin= remove the =--installdir=dist=
 argument. =CABAL_DIR= defaults to =~/.local/state/cabal=.
 
 * Usage
+get values
 : mpd-current-json | jaq .tags.album
+: mpd-current-json | jaq .status.elapsed_percent
+
 provide host and port with
-: mpd-current-json -p 4321
+: mpd-current-json -h 'localhost' -p 4321
 
 
 * Files
