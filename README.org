@@ -4,7 +4,7 @@
 ** Source
 *** Main.hs
 :PROPERTIES:
-:header-args:haskell+: :tangle Main.hs
+:header-args:haskell+: :tangle src/Main.hs
 :END:
 **** Pragma language extensions
 #+begin_src haskell
@@ -23,20 +23,16 @@ import Data.Aeson.Encode.Pretty ( encodePretty )
 import qualified Data.ByteString.Lazy.Char8 as C
 import Text.Printf ( printf )
 import Options
-
 #+end_src
 
 **** Main
-:PROPERTIES:
-:header-args:haskell+: :padline no
-:END:
-#+begin_src haskell
+#+begin_src haskell :padline no
 main :: IO ()
 main = do
 #+end_src
 
 Parse the command-line options and bind the result to =opts=.
-#+begin_src haskell
+#+begin_src haskell :padline no
   opts <- execParser optsParserInfo
 #+end_src
 
@@ -206,7 +202,6 @@ terminal. =Data.Aeson='s encoding is returned as a =ByteString= so use the
 that supports =ByteString=​s.
 #+begin_src haskell
   C.putStrLn $ encodePretty jObject
-
 #+end_src
 
 ***** Utility Functions
@@ -297,7 +292,7 @@ _   .=? Nothing    = Nothing
 
 *** Options.hs
 :PROPERTIES:
-:header-args:haskell+: :tangle Options.hs
+:header-args:haskell+: :tangle src/Options.hs
 :END:
 #+begin_src haskell
 module Options
@@ -420,7 +415,7 @@ optsParserInfo = info (optsParser <**> helper)
 
 *** Version.hs
 :PROPERTIES:
-:header-args:haskell+: :tangle Version.hs
+:header-args:haskell+: :tangle src/Version.hs
 :END:
 #+begin_src haskell
 module Version ( versionStr,

@@ -12,8 +12,10 @@ import Options
 main :: IO ()
 main = do
   opts <- execParser optsParserInfo
+
   cs <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.currentSong
   st <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.status
+
   let artist                     = getTag Artist                     cs
       artistSort                 = getTag ArtistSort                 cs
       album                      = getTag Album                      cs
@@ -40,6 +42,7 @@ main = do
       musicbrainz_Trackid        = getTag MUSICBRAINZ_TRACKID        cs
       musicbrainz_Releasetrackid = getTag MUSICBRAINZ_RELEASETRACKID cs
       musicbrainz_Workid         = getTag MUSICBRAINZ_WORKID         cs
+
   let state :: Maybe String
       state = case getStatusItem st MPD.stState of
                 Just ps -> case ps of
@@ -78,6 +81,7 @@ main = do
       bitrate = getStatusItem st MPD.stBitrate
       audioFormat = getStatusItem st MPD.stAudio
       errorSt = getStatusItem st MPD.stError
+
   -- sgTags
   let jTags = object . catMaybes $
         [ "artist"                     .=? artist
@@ -124,29 +128,37 @@ main = do
         , "audio_format"    .=? audioFormat
         , "error"           .=? errorSt
         ]
+
   let jObject = object [ "tags" .= jTags
                        , "status" .= jStatus ]
+
   C.putStrLn $ encodePretty jObject
+
 getStatusItem :: Either MPD.MPDError MPD.Status -> (MPD.Status -> a) -> Maybe a
 getStatusItem (Right st) f = Just (f st)
 getStatusItem _ _ = Nothing
+
 getTag :: Metadata -> Either a (Maybe Song) -> Maybe String
 getTag t c =
   case c of
     Left _ -> Nothing
     Right song -> processSong t song
+
 processSong :: Metadata -> Maybe Song -> Maybe String
 processSong _ Nothing = Nothing
 processSong tag (Just song) = do
   let tagVal = MPD.sgGetTag tag song
   valueToStringMay =<< (headMay =<< tagVal)
+
 -- Utility function to safely get the head of a list
 headMay :: [a] -> Maybe a
 headMay []    = Nothing
 headMay (x:_) = Just x
+
 -- Utility function to convert Value to String within a Maybe context
 valueToStringMay :: MPD.Value -> Maybe String
 valueToStringMay x = Just (MPD.toString x)
+
 -- Utility function to define optional fields
 (.=?) :: (KeyValue a, ToJSON v) => Key -> Maybe v -> Maybe a
 key .=? Just value = Just (key .= value)
