@@ -588,3 +588,7 @@ Initial working version
 # 2023-06-01:
 - First version. Released on an unsuspecting world.
 
+* Local file variables                                             :noexport:
+# Local Variables:
+# org-src-preserve-indentation: t
+# End:
