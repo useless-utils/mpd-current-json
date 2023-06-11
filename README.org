@@ -1,4 +1,22 @@
 # #+PROPERTY: header-args :comments link
+#+OPTIONS: toc:1
+
+* Installation
+#+begin_example
+git clone https://codeberg.org/useless-utils/mpd-current-json
+cd mpd-current-json
+#+end_example
+and to install the executable to =./dist=, in the current directory:
+: cabal install --install-method=copy --overwrite-policy=always --installdir=dist
+or to install to =${CABAL_DIR}/bin= remove the =--installdir=dist=
+argument. =CABAL_DIR= defaults to =~/.local/state/cabal=.
+
+* Usage
+: mpd-current-json | jaq .tags.album
+provide host and port with
+: mpd-current-json -p 4321
+
+
 * Files
 
 ** Source
@@ -323,7 +341,10 @@ import Options.Applicative
       helper,
       Parser,
       ParserInfo,
-      infoOption )
+      infoOption,
+      hidden )
+
+import Options.Applicative.Extra ( helperWith )
 
 import Version ( versionStr, progName )
 import Data.Kind (Type)
@@ -370,7 +391,7 @@ optsParser
       = strOption
       $ metavar "ADDRESS"
       <> long "host"
-      <> short 'H'
+      <> short 'h'
       <> value "localhost"
       <> help "Host address"
 
@@ -406,11 +427,34 @@ screen.
   using a [[*Data record for holding parsed 'Parser' values][​custom data record​]].
 #+begin_src haskell
 optsParserInfo :: ParserInfo Opts
-optsParserInfo = info (optsParser <**> helper)
+optsParserInfo = info (optsParser <**> helper')
   $ fullDesc
   <> progDesc "Print currently playing song information as JSON"
   <> header (progName ++ " - " ++ "Current MPD song information as JSON")
+#+end_src
 
+**** Custom helper
+#+begin_quote
+Like helper, but with a minimal set of modifiers that can be extended
+as desired.
+  #+begin_src haskell :tangle no
+  opts :: ParserInfo Sample
+  opts = info (sample <**> helperWith (mconcat [
+           long "help",
+           short 'h',
+           help "Show this help text",
+           hidden
+         ])) mempty
+  #+end_src
+
+--- source of [[https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#v:helper][Options.Applicative#helper]]
+#+end_quote
+Define a helper command that only accepts long =--help=:
+#+begin_src haskell
+helper' = helperWith
+          $ long "help"
+          -- <> help "Show this help text"
+          <> hidden -- don't show in help messages
 #+end_src
 
 *** Version.hs
@@ -461,7 +505,7 @@ name:               mpd-current-json
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            1.0.0.0
+version:            1.1.0.0
 synopsis:           Print current MPD song and status as json
 
 -- A longer description of the package.

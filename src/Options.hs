@@ -26,7 +26,10 @@ import Options.Applicative
       helper,
       Parser,
       ParserInfo,
-      infoOption )
+      infoOption,
+      hidden )
+
+import Options.Applicative.Extra ( helperWith )
 
 import Version ( versionStr, progName )
 import Data.Kind (Type)
@@ -60,7 +63,7 @@ optsParser
       = strOption
       $ metavar "ADDRESS"
       <> long "host"
-      <> short 'H'
+      <> short 'h'
       <> value "localhost"
       <> help "Host address"
 
@@ -81,7 +84,12 @@ optsParser
       <> help "Display the version number"
 
 optsParserInfo :: ParserInfo Opts
-optsParserInfo = info (optsParser <**> helper)
+optsParserInfo = info (optsParser <**> helper')
   $ fullDesc
   <> progDesc "Print currently playing song information as JSON"
   <> header (progName ++ " - " ++ "Current MPD song information as JSON")
+
+helper' = helperWith
+          $ long "help"
+          -- <> help "Show this help text"
+          <> hidden -- don't show in help messages
