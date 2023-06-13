@@ -1,11 +1,11 @@
-- [Installation](#org0e56154)
-- [Usage](#orgc19231c)
-- [Files](#org0a09135)
-- [Changelog](#org879ff8e)
+- [Installation](#org612f7f8)
+- [Usage](#org31b2d26)
+- [Files](#org839022f)
+- [Changelog](#orga0126ff)
 
 
 
-<a id="org0e56154"></a>
+<a id="org612f7f8"></a>
 
 # Installation
 
@@ -21,7 +21,7 @@ and to install the executable to `./dist`, in the current directory:
 or to install to `${CABAL_DIR}/bin` remove the `--installdir=dist` argument. `CABAL_DIR` defaults to `~/.local/state/cabal`.
 
 
-<a id="orgc19231c"></a>
+<a id="org31b2d26"></a>
 
 # Usage
 
@@ -35,7 +35,7 @@ provide host and port with
     mpd-current-json -h 'localhost' -p 4321
 
 
-<a id="org0a09135"></a>
+<a id="org839022f"></a>
 
 # Files
 
@@ -53,7 +53,7 @@ provide host and port with
 
 2.  Imports
 
-    Import for the `libmpd` library, added as `libmpd == 0.10.*` to [mpd-current-json.cabal](#orge586408).
+    Import for the `libmpd` library, added as `libmpd == 0.10.*` to [mpd-current-json.cabal](#org997dd38).
     
     ```haskell
     import qualified Network.MPD as MPD
@@ -80,7 +80,7 @@ provide host and port with
       opts <- execParser optsParserInfo
     ```
     
-    Connect to MPD using either the provided arguments from the command-line or the default values, as defined in [​`Parser Opts` definition](#org892f8b3).
+    Connect to MPD using either the provided arguments from the command-line or the default values, as defined in [​`Parser Opts` definition](#org8d52a74).
     
     ```haskell
       cs <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.currentSong
@@ -231,7 +231,7 @@ provide host and port with
     
     1.  Utility Functions
     
-        The `getStatusItem` function takes an `Either MPD.MPDError MPD.Status` value and a field label function `f` as arguments. It returns `Just (f st)` if the input status is `Right st`, where `st` is the `MPD.Status` value. This function allows you to extract a specific field from the status by providing the corresponding field label function. If the input status is not `Right st`, indicating an error, or the field label function is not applicable, it returns `Nothing`.
+        The `getStatusItem` function takes an `Either MPD.MPDError MPD.Status` value and a field label function `f` as arguments. It returns `Just (f st)` if the input status is `Right st`, where `st` is the `MPD.Status` value. This function helps to extract a specific field from the status by providing the corresponding field label function. If the input status is not `Right st`, indicating an error, or the field label function is not applicable, it returns `Nothing`.
         
         ```haskell
         getStatusItem :: Either MPD.MPDError MPD.Status -> (MPD.Status -> a) -> Maybe a
@@ -239,7 +239,7 @@ provide host and port with
         getStatusItem _ _ = Nothing
         ```
         
-        The `getTag` function takes a metadata type `t` and an `Either` value `c` containing a `Maybe Song`. It checks if the `Either` value is `Left _`, indicating an error, and returns `Nothing`. If the `Either` value is `Right song`, it calls the `processSong` function with the metadata type `t` and the `Just song` value, which extracts the tag value from the song. The `getTag` function allows you to retrieve a specific tag value from the song if it exists.
+        The `getTag` function takes a metadata type `t` and an `Either` value `c` containing a `Maybe Song`. It checks if the `Either` value is `Left _`, indicating an error, and returns `Nothing`. If the `Either` value is `Right song`, it calls the `processSong` function with the metadata type `t` and the `Just song` value, which extracts the tag value from the song. The `getTag` function helps to retrieve a specific tag value from the song if it exists.
         
         ```haskell
         getTag :: Metadata -> Either a (Maybe Song) -> Maybe String
@@ -249,7 +249,7 @@ provide host and port with
             Right song -> processSong t song
         ```
         
-        The `processSong` function takes a metadata type `tag` and a `Maybe Song`. If the `Maybe Song` value is `Nothing`, indicating an empty value, it returns `Nothing`. If the `Maybe Song` value is `Just song`, it retrieves the tag value using the `MPD.sgGetTag` function with the provided metadata type and song. It then applies the `headMay` function to extract the first element from the list of tag values and the `valueToStringMay` function to convert the value to a string within a `Maybe` context. This function allows you to process the tag values of a song and convert them to strings if they exist.
+        The `processSong` function takes a metadata type `tag` and a `Maybe Song`. If the `Maybe Song` value is `Nothing`, indicating an empty value, it returns `Nothing`. If the `Maybe Song` value is `Just song`, it retrieves the tag value using the `MPD.sgGetTag` function with the provided metadata type and song. It then applies the `headMay` function to extract the first element from the list of tag values and the `valueToStringMay` function to convert the value to a string within a `Maybe` context. This function helps to process the tag values of a song and convert them to strings if they exist.
         
         ```haskell
         processSong :: Metadata -> Maybe Song -> Maybe String
@@ -276,7 +276,7 @@ provide host and port with
         valueToStringMay x = Just (MPD.toString x)
         ```
         
-        The `.=?` operator is a utility function to define optional fields in the key-value pairs of a JSON object. It takes a `Key` and a `Maybe` value `v` as input. If the `Maybe` value is `Just value`, it returns `Just (key .= value)`, where `key` is the input key and `value` is the input value. If the `Maybe` value is `Nothing`, it returns `Nothing`. This operator allows you to conditionally include or exclude fields in the JSON object based on the presence or absence of values.
+        The `.=?` operator is a utility function to define optional fields in the key-value pairs of a JSON object. It takes a `Key` and a `Maybe` value `v` as input. If the `Maybe` value is `Just value`, it returns `Just (key .= value)`, where `key` is the input key and `value` is the input value. If the `Maybe` value is `Nothing`, it returns `Nothing`. This operator helps to conditionally include or exclude fields in the JSON object based on the presence or absence of values.
         
         ```haskell
         -- Utility function to define optional fields
@@ -394,7 +394,7 @@ import Data.Kind (Type)
     
     -   `optsParserInfo`
         
-        Utility function for `Options.Applicative`'s "`info`" that create a `ParserInfo` given a [​`Parser`​](https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#t:Parser) and a modifier, where `Parser`​s are defined using a [​custom data record​](#org8119e24).
+        Utility function for `Options.Applicative`'s "`info`" that create a `ParserInfo` given a [​`Parser`​](https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#t:Parser) and a modifier, where `Parser`​s are defined using a [​custom data record​](#orga04dbef).
     
     ```haskell
     optsParserInfo :: ParserInfo Opts
@@ -453,7 +453,7 @@ versionStr = progName ++ " version " ++ (showVersion version)
 
 ### CHANGELOG.org
 
-File to be tangled and include the [Changelog](#org879ff8e) heading.
+File to be tangled and include the [Changelog](#orga0126ff) heading.
 
 
 ### mpd-current-json.cabal
@@ -526,7 +526,7 @@ executable mpd-current-json
 ```
 
 
-<a id="org879ff8e"></a>
+<a id="orga0126ff"></a>
 
 # Changelog
 
