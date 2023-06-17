@@ -9,6 +9,7 @@ import Data.Aeson.Encode.Pretty ( encodePretty )
 import qualified Data.ByteString.Lazy.Char8 as C
 import Text.Printf ( printf )
 import Options
+    ( optsParserInfo, execParser, Opts(optPass, optHost, optPort) )
 main :: IO ()
 main = do
   opts <- execParser optsParserInfo
@@ -56,13 +57,13 @@ main = do
       elapsed = case time of
         Just t -> case t of
                     Just (e, _) -> Just e
-                    _ -> Nothing
+                    _           -> Nothing
         Nothing -> Nothing
 
       duration = case time of
         Just t -> case t of
                     Just (_, d) -> Just d
-                    _ -> Nothing
+                    _           -> Nothing
         Nothing -> Nothing
 
       elapsedPercent :: Maybe Double
@@ -72,15 +73,15 @@ main = do
                     Nothing -> Just 0
         Nothing -> Nothing
 
-      repeatSt = getStatusItem st MPD.stRepeat
-      randomSt = getStatusItem st MPD.stRandom
-      singleSt = getStatusItem st MPD.stSingle
-      consumeSt = getStatusItem st MPD.stConsume
-      pos = getStatusItem st MPD.stSongPos
+      repeatSt       = getStatusItem st MPD.stRepeat
+      randomSt       = getStatusItem st MPD.stRandom
+      singleSt       = getStatusItem st MPD.stSingle
+      consumeSt      = getStatusItem st MPD.stConsume
+      pos            = getStatusItem st MPD.stSongPos
       playlistLength = getStatusItem st MPD.stPlaylistLength
-      bitrate = getStatusItem st MPD.stBitrate
-      audioFormat = getStatusItem st MPD.stAudio
-      errorSt = getStatusItem st MPD.stError
+      bitrate        = getStatusItem st MPD.stBitrate
+      audioFormat    = getStatusItem st MPD.stAudio
+      errorSt        = getStatusItem st MPD.stError
 
   -- sgTags
   let jTags = object . catMaybes $
@@ -129,7 +130,7 @@ main = do
         , "error"           .=? errorSt
         ]
 
-  let jObject = object [ "tags" .= jTags
+  let jObject = object [ "tags"   .= jTags
                        , "status" .= jStatus ]
 
   C.putStrLn $ encodePretty jObject

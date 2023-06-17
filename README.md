@@ -1,11 +1,11 @@
-- [Installation](#org612f7f8)
-- [Usage](#org31b2d26)
-- [Files](#org839022f)
-- [Changelog](#orga0126ff)
+- [Installation](#orgd021df8)
+- [Usage](#org19d2a48)
+- [Files](#org7feb9af)
+- [Changelog](#org2652be5)
 
 
 
-<a id="org612f7f8"></a>
+<a id="orgd021df8"></a>
 
 # Installation
 
@@ -18,10 +18,10 @@ and to install the executable to `./dist`, in the current directory:
 
     cabal install --install-method=copy --overwrite-policy=always --installdir=dist
 
-or to install to `${CABAL_DIR}/bin` remove the `--installdir=dist` argument. `CABAL_DIR` defaults to `~/.local/state/cabal`.
+or to install to `${CABAL_DIR}/bin` remove the `--installdir=dist` argument. `CABAL_DIR` defaults to `~/.local/share/cabal`.
 
 
-<a id="org31b2d26"></a>
+<a id="org19d2a48"></a>
 
 # Usage
 
@@ -35,7 +35,7 @@ provide host and port with
     mpd-current-json -h 'localhost' -p 4321
 
 
-<a id="org839022f"></a>
+<a id="org7feb9af"></a>
 
 # Files
 
@@ -53,7 +53,7 @@ provide host and port with
 
 2.  Imports
 
-    Import for the `libmpd` library, added as `libmpd == 0.10.*` to [mpd-current-json.cabal](#org997dd38).
+    Import for the `libmpd` library, added as `libmpd == 0.10.*` to [mpd-current-json.cabal](#orgf69ab14).
     
     ```haskell
     import qualified Network.MPD as MPD
@@ -65,6 +65,7 @@ provide host and port with
     import qualified Data.ByteString.Lazy.Char8 as C
     import Text.Printf ( printf )
     import Options
+        ( optsParserInfo, execParser, Opts(optPass, optHost, optPort) )
     ```
 
 3.  Main
@@ -80,7 +81,7 @@ provide host and port with
       opts <- execParser optsParserInfo
     ```
     
-    Connect to MPD using either the provided arguments from the command-line or the default values, as defined in [​`Parser Opts` definition](#org8d52a74).
+    Connect to MPD using either the provided arguments from the command-line or the default values, as defined in [​`Parser Opts` definition](#orga8d839f).
     
     ```haskell
       cs <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.currentSong
@@ -136,13 +137,13 @@ provide host and port with
           elapsed = case time of
             Just t -> case t of
                         Just (e, _) -> Just e
-                        _ -> Nothing
+                        _           -> Nothing
             Nothing -> Nothing
     
           duration = case time of
             Just t -> case t of
                         Just (_, d) -> Just d
-                        _ -> Nothing
+                        _           -> Nothing
             Nothing -> Nothing
     
           elapsedPercent :: Maybe Double
@@ -152,15 +153,15 @@ provide host and port with
                         Nothing -> Just 0
             Nothing -> Nothing
     
-          repeatSt = getStatusItem st MPD.stRepeat
-          randomSt = getStatusItem st MPD.stRandom
-          singleSt = getStatusItem st MPD.stSingle
-          consumeSt = getStatusItem st MPD.stConsume
-          pos = getStatusItem st MPD.stSongPos
+          repeatSt       = getStatusItem st MPD.stRepeat
+          randomSt       = getStatusItem st MPD.stRandom
+          singleSt       = getStatusItem st MPD.stSingle
+          consumeSt      = getStatusItem st MPD.stConsume
+          pos            = getStatusItem st MPD.stSongPos
           playlistLength = getStatusItem st MPD.stPlaylistLength
-          bitrate = getStatusItem st MPD.stBitrate
-          audioFormat = getStatusItem st MPD.stAudio
-          errorSt = getStatusItem st MPD.stError
+          bitrate        = getStatusItem st MPD.stBitrate
+          audioFormat    = getStatusItem st MPD.stAudio
+          errorSt        = getStatusItem st MPD.stError
     ```
     
     The `object . catMaybes` constructs a JSON object by combining a list of key/value pairs. The `.=?` operator is used to create each key/value pair. If the value is `Just`, the key/value pair is included in the list; if the value is `Nothing`, it is filtered out using `catMaybes` to prevent generating fields with a value of `null` in the final JSON object. Then, the `object` function converts the list of key/value pairs into an `Object` data structure that can be 'encoded' using `Data.Aeson`'s "`encode`" or `Data.Aeson.Encode.Pretty`'s "`encodePretty`".
@@ -217,7 +218,7 @@ provide host and port with
     Having two objects, one for "tags" and other for "status", create a nested JSON with labels before each of them.
     
     ```haskell
-      let jObject = object [ "tags" .= jTags
+      let jObject = object [ "tags"   .= jTags
                            , "status" .= jStatus ]
     ```
     
@@ -314,7 +315,6 @@ import Options.Applicative
       showHelpOnEmpty,
       value,
       execParser,
-      helper,
       Parser,
       ParserInfo,
       infoOption,
@@ -352,40 +352,40 @@ import Data.Kind (Type)
       <*> hostOptParser
       <*> passOptParser
       <*> versionOptParse
-      where
-        portOptParser :: Parser Integer
-        portOptParser
-          = option auto
-          $ long "port"
-          <> short 'p'
-          <> metavar "PORTNUM"
-          <> value 6600
-          <> help "Port number"
     
-        hostOptParser :: Parser String
-        hostOptParser
-          = strOption
-          $ metavar "ADDRESS"
-          <> long "host"
-          <> short 'h'
-          <> value "localhost"
-          <> help "Host address"
+    portOptParser :: Parser Integer
+    portOptParser
+      = option auto
+      $ long "port"
+      <> short 'p'
+      <> metavar "PORTNUM"
+      <> value 6600
+      <> help "Port number"
     
-        passOptParser :: Parser String
-        passOptParser
-          = option auto
-          $ metavar "PASSWORD"
-          <> long "password"
-          <> short 'P'
-          <> value ""
-          <> help "Password for connecting (will be sent as plain text)"
+    hostOptParser :: Parser String
+    hostOptParser
+      = strOption
+      $ metavar "ADDRESS"
+      <> long "host"
+      <> short 'h'
+      <> value "localhost"
+      <> help "Host address"
     
-        versionOptParse :: Parser (a -> a)
-        versionOptParse =
-          infoOption versionStr
-          $ long "version"
-          <> short 'V'
-          <> help "Display the version number"
+    passOptParser :: Parser String
+    passOptParser
+      = option auto
+      $ metavar "PASSWORD"
+      <> long "password"
+      <> short 'P'
+      <> value ""
+      <> help "Password for connecting (will be sent as plain text)"
+    
+    versionOptParse :: Parser (a -> a)
+    versionOptParse =
+      infoOption versionStr
+      $ long "version"
+      <> short 'V'
+      <> help "Display the version number"
     ```
 
 3.  Create ParserInfo
@@ -394,7 +394,7 @@ import Data.Kind (Type)
     
     -   `optsParserInfo`
         
-        Utility function for `Options.Applicative`'s "`info`" that create a `ParserInfo` given a [​`Parser`​](https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#t:Parser) and a modifier, where `Parser`​s are defined using a [​custom data record​](#orga04dbef).
+        Utility function for `Options.Applicative`'s "`info`" that create a `ParserInfo` given a [​`Parser`​](https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#t:Parser) and a modifier, where `Parser`​s are defined using a [​custom data record​](#org2ea1a39).
     
     ```haskell
     optsParserInfo :: ParserInfo Opts
@@ -423,6 +423,7 @@ import Data.Kind (Type)
     Define a helper command that only accepts long `--help`:
     
     ```haskell
+    helper' :: Parser (a -> a)
     helper' = helperWith
               $ long "help"
               -- <> help "Show this help text"
@@ -453,7 +454,7 @@ versionStr = progName ++ " version " ++ (showVersion version)
 
 ### CHANGELOG.org
 
-File to be tangled and include the [Changelog](#orga0126ff) heading.
+File to be tangled and include the [Changelog](#org2652be5) heading.
 
 
 ### mpd-current-json.cabal
@@ -526,7 +527,7 @@ executable mpd-current-json
 ```
 
 
-<a id="orga0126ff"></a>
+<a id="org2652be5"></a>
 
 # Changelog
 
