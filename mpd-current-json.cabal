@@ -25,6 +25,7 @@ maintainer:         g@11xx.org
 -- copyright:
 category:           Network
 extra-source-files: CHANGELOG.org
+                    README.md
 
 executable mpd-current-json
     main-is:          Main.hs
