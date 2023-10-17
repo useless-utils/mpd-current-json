@@ -24,7 +24,7 @@ maintainer:         g@11xx.org
 -- A copyright notice.
 -- copyright:
 category:           Network
-extra-source-files: CHANGELOG.org
+extra-source-files: CHANGELOG.md
                     README.md
 
 source-repository head

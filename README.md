@@ -1,11 +1,11 @@
-- [Installation](#org8bcf468)
-- [Usage](#org0b88bb1)
-- [Files](#org68de24f)
-- [Changelog](#orgdae801a)
+- [Installation](#org5e537eb)
+- [Usage](#orgdbbe2b9)
+- [Files](#orgb11dc5a)
+- [Changelog](#orgbd9297a)
 
 
 
-<a id="org8bcf468"></a>
+<a id="org5e537eb"></a>
 
 # Installation
 
@@ -21,7 +21,7 @@ and to install the executable to `./dist`, in the current directory:
 or to install to `${CABAL_DIR}/bin` remove the `--installdir=dist` argument. `CABAL_DIR` defaults to `~/.local/share/cabal`.
 
 
-<a id="org0b88bb1"></a>
+<a id="orgdbbe2b9"></a>
 
 # Usage
 
@@ -35,7 +35,7 @@ provide host and port with
     mpd-current-json -h 'localhost' -p 4321
 
 
-<a id="org68de24f"></a>
+<a id="orgb11dc5a"></a>
 
 # Files
 
@@ -65,7 +65,7 @@ provide host and port with
 
 3.  Imports
 
-    Import for the `libmpd` library, added as `libmpd == 0.10.*` to [mpd-current-json.cabal](#org20f3747).
+    Import for the `libmpd` library, added as `libmpd == 0.10.*` to [mpd-current-json.cabal](#org78142c9).
     
     ```haskell
     import qualified Network.MPD as MPD
@@ -99,7 +99,7 @@ provide host and port with
       opts <- execParser optsParserInfo
     ```
     
-    Connect to MPD using either the provided arguments from the command-line or the default values, as defined in [​`Parser Opts` definition](#org1497560).
+    Connect to MPD using either the provided arguments from the command-line or the default values, as defined in [​`Parser Opts` definition](#orgab73638).
     
     ```haskell
       cs <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.currentSong
@@ -467,7 +467,7 @@ import Data.Kind (Type)
     
     -   `optsParserInfo`
         
-        Utility function for `Options.Applicative`'s "`info`" that create a `ParserInfo` given a [​`Parser`​](https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#t:Parser) and a modifier, where `Parser`​s are defined using a [​custom data record​](#orgc345dd4).
+        Utility function for `Options.Applicative`'s "`info`" that create a `ParserInfo` given a [​`Parser`​](https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#t:Parser) and a modifier, where `Parser`​s are defined using a [​custom data record​](#orga7622d9).
     
     ```haskell
     optsParserInfo :: ParserInfo Opts
@@ -522,6 +522,16 @@ versionStr = progName ++ " version " ++ (showVersion version)
 ```
 
 
+### Setup.hs
+
+Allow `runhaskell` to use `cabal`
+
+```haskell
+import Distribution.Simple
+main = defaultMain
+```
+
+
 ## Extra
 
 
@@ -554,7 +564,7 @@ maintainer:         g@11xx.org
 -- A copyright notice.
 -- copyright:
 category:           Network
-extra-source-files: CHANGELOG.org
+extra-source-files: CHANGELOG.md
                     README.md
 
 source-repository head
@@ -601,38 +611,32 @@ executable mpd-current-json
 ```
 
 
-<a id="orgdae801a"></a>
+<a id="orgbd9297a"></a>
 
 # Changelog
 
-```org
-#+TITLE: Revision history for mpd-current-json
-#+DATE: 2023-06-01 Thu 15:29:07 -03
-# #+INCLUDE: README.org::*Changelog
-#+OPTIONS: toc:nil prop:t date:nil timestamp:nil num:nil
-
-* v1.1.0.1
+```markdown
+# v1.1.0.1
+[comment]: # (2023-10-17)
 - Added haddock comments
-- Addressed =cabal check= warnings;
+- Addressed `cabal check` warnings;
 - setup for uploading as a Hackage package.
 
-* v1.1.0.0
-# 2023-06-11
-- Remove =-h= from =--help= and use =-h= for =--host=
-- Make =--help= option hidden in the help message
+# v1.1.0.0
+[comment]: # (2023-06-11)
+- Remove `-h` from `--help` and use `-h` for `--host`
+- Make `--help` option hidden in the help message
 
-* v1.0.0.0
-# 2023-06-08:
+# v1.0.0.0
+[comment]: # (2023-06-08)
 Initial working version
 - Added conditional tags printing, only non-empty values are printed
 - Accept host, port and password
-- Nested json objects for =status= and =tags=
-- Added =elapsed_percent= key shortcut for =elapsed / duration * 100=
+- Nested json objects for `status` and `tags`
+- Added `elapsed_percent` key shortcut for `elapsed / duration * 100`
 
-* v0.0.1.0
-# 2023-06-02:
+# v0.0.1.0
+[comment]: # (2023-06-01)
 - initial connection and parsing values
-
-# 2023-06-01:
 - First version. Released on an unsuspecting world.
 ```

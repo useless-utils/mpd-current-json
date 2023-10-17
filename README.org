@@ -554,6 +554,16 @@ versionStr = progName ++ " version " ++ (showVersion version)
 #+end_src
 
 
+*** Setup.hs
+:PROPERTIES:
+:header-args:haskell+: :tangle Setup.hs
+:END:
+Allow =runhaskell= to use =cabal=
+#+begin_src haskell
+import Distribution.Simple
+main = defaultMain
+#+end_src
+
 ** Extra
 # *** CHANGELOG.org
 # :PROPERTIES:
@@ -599,7 +609,7 @@ maintainer:         g@11xx.org
 -- A copyright notice.
 -- copyright:
 category:           Network
-extra-source-files: CHANGELOG.org
+extra-source-files: CHANGELOG.md
                     README.md
 
 source-repository head
@@ -647,35 +657,62 @@ executable mpd-current-json
 
 
 * Changelog
-#+begin_src org :tangle CHANGELOG.org
-,#+TITLE: Revision history for mpd-current-json
-,#+DATE: 2023-06-01 Thu 15:29:07 -03
-# #+INCLUDE: README.org::*Changelog
-,#+OPTIONS: toc:nil prop:t date:nil timestamp:nil num:nil
+# #+begin_src org :tangle CHANGELOG.org
+# ,#+TITLE: Revision history for mpd-current-json
+# ,#+DATE: 2023-06-01 Thu 15:29:07 -03
+# # #+INCLUDE: README.org::*Changelog
+# ,#+OPTIONS: toc:nil prop:t date:nil timestamp:nil num:nil
 
-,* v1.1.0.1
+# ,* v1.1.0.1
+# # 2023-10-17
+# - Added haddock comments
+# - Addressed =cabal check= warnings;
+# - setup for uploading as a Hackage package.
+
+# ,* v1.1.0.0
+# # 2023-06-11
+# - Remove =-h= from =--help= and use =-h= for =--host=
+# - Make =--help= option hidden in the help message
+
+# ,* v1.0.0.0
+# # 2023-06-08:
+# Initial working version
+# - Added conditional tags printing, only non-empty values are printed
+# - Accept host, port and password
+# - Nested json objects for =status= and =tags=
+# - Added =elapsed_percent= key shortcut for =elapsed / duration * 100=
+
+# ,* v0.0.1.0
+# # 2023-06-02:
+# - initial connection and parsing values
+
+# # 2023-06-01:
+# - First version. Released on an unsuspecting world.
+# #+end_src
+
+#+begin_src markdown :tangle CHANGELOG.md
+# v1.1.0.1
+[comment]: # (2023-10-17)
 - Added haddock comments
-- Addressed =cabal check= warnings;
+- Addressed `cabal check` warnings;
 - setup for uploading as a Hackage package.
 
-,* v1.1.0.0
-# 2023-06-11
-- Remove =-h= from =--help= and use =-h= for =--host=
-- Make =--help= option hidden in the help message
+# v1.1.0.0
+[comment]: # (2023-06-11)
+- Remove `-h` from `--help` and use `-h` for `--host`
+- Make `--help` option hidden in the help message
 
-,* v1.0.0.0
-# 2023-06-08:
+# v1.0.0.0
+[comment]: # (2023-06-08)
 Initial working version
 - Added conditional tags printing, only non-empty values are printed
 - Accept host, port and password
-- Nested json objects for =status= and =tags=
-- Added =elapsed_percent= key shortcut for =elapsed / duration * 100=
+- Nested json objects for `status` and `tags`
+- Added `elapsed_percent` key shortcut for `elapsed / duration * 100`
 
-,* v0.0.1.0
-# 2023-06-02:
+# v0.0.1.0
+[comment]: # (2023-06-01)
 - initial connection and parsing values
-
-# 2023-06-01:
 - First version. Released on an unsuspecting world.
 #+end_src
 
