@@ -33,11 +33,11 @@ import Options.Applicative.Extra ( helperWith )
 import Version ( versionStr, progName )
 import Data.Kind (Type)
 
-data Opts = Opts
-  { optPort    :: Integer
-  , optHost    :: String
-  , optPass    :: String
-  , optVersion :: Type -> Type
+data Opts = Opts  -- ^ Custom data record for storing 'Options.Applicative.Parser' values
+  { optPort    :: Integer  -- ^ MPD port to connect.
+  , optHost    :: String   -- ^ MPD host address to connect.
+  , optPass    :: String   -- ^ Plain text password to connect to MPD.
+  , optVersion :: Type -> Type  -- ^ Print program version.
   }
 
 optsParser :: Parser Opts
