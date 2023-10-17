@@ -582,7 +582,7 @@ name:               mpd-current-json
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            1.1.0.0
+version:            1.1.0.1
 synopsis:           Print current MPD song and status as json
 
 -- A longer description of the package.
@@ -652,6 +652,11 @@ executable mpd-current-json
 ,#+DATE: 2023-06-01 Thu 15:29:07 -03
 # #+INCLUDE: README.org::*Changelog
 ,#+OPTIONS: toc:nil prop:t date:nil timestamp:nil num:nil
+
+,* v1.1.0.1
+- Added haddock comments
+- Addressed =cabal check= warnings;
+- setup for uploading as a Hackage package.
 
 ,* v1.1.0.0
 # 2023-06-11

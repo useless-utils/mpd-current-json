@@ -3,6 +3,11 @@
 # #+INCLUDE: README.org::*Changelog
 #+OPTIONS: toc:nil prop:t date:nil timestamp:nil num:nil
 
+* v1.1.0.1
+- Added haddock comments
+- Addressed =cabal check= warnings;
+- setup for uploading as a Hackage package.
+
 * v1.1.0.0
 # 2023-06-11
 - Remove =-h= from =--help= and use =-h= for =--host=
