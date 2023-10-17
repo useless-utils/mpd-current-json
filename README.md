@@ -1,11 +1,11 @@
-- [Installation](#orgc987a21)
-- [Usage](#org6f7fecd)
-- [Files](#org609c3f4)
-- [Changelog](#orgd45ec38)
+- [Installation](#orgd771717)
+- [Usage](#org7aa2a8f)
+- [Files](#org52f41b8)
+- [Changelog](#org7bcee54)
 
 
 
-<a id="orgc987a21"></a>
+<a id="orgd771717"></a>
 
 # Installation
 
@@ -21,7 +21,7 @@ and to install the executable to `./dist`, in the current directory:
 or to install to `${CABAL_DIR}/bin` remove the `--installdir=dist` argument. `CABAL_DIR` defaults to `~/.local/share/cabal`.
 
 
-<a id="org6f7fecd"></a>
+<a id="org7aa2a8f"></a>
 
 # Usage
 
@@ -35,7 +35,7 @@ provide host and port with
     mpd-current-json -h 'localhost' -p 4321
 
 
-<a id="org609c3f4"></a>
+<a id="org52f41b8"></a>
 
 # Files
 
@@ -65,7 +65,7 @@ provide host and port with
 
 3.  Imports
 
-    Import for the `libmpd` library, added as `libmpd == 0.10.*` to [mpd-current-json.cabal](#org7a82837).
+    Import for the `libmpd` library, added as `libmpd == 0.10.*` to [mpd-current-json.cabal](#org072006c).
     
     ```haskell
     import qualified Network.MPD as MPD
@@ -99,7 +99,7 @@ provide host and port with
       opts <- execParser optsParserInfo
     ```
     
-    Connect to MPD using either the provided arguments from the command-line or the default values, as defined in [​`Parser Opts` definition](#org453d46d).
+    Connect to MPD using either the provided arguments from the command-line or the default values, as defined in [​`Parser Opts` definition](#orgae86c3f).
     
     ```haskell
       cs <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.currentSong
@@ -467,7 +467,7 @@ import Data.Kind (Type)
     
     -   `optsParserInfo`
         
-        Utility function for `Options.Applicative`'s "`info`" that create a `ParserInfo` given a [​`Parser`​](https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#t:Parser) and a modifier, where `Parser`​s are defined using a [​custom data record​](#orgf213768).
+        Utility function for `Options.Applicative`'s "`info`" that create a `ParserInfo` given a [​`Parser`​](https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#t:Parser) and a modifier, where `Parser`​s are defined using a [​custom data record​](#org2e4d296).
     
     ```haskell
     optsParserInfo :: ParserInfo Opts
@@ -525,11 +525,6 @@ versionStr = progName ++ " version " ++ (showVersion version)
 ## Extra
 
 
-### CHANGELOG.org
-
-File to be tangled and include the [Changelog](#orgd45ec38) heading.
-
-
 ### mpd-current-json.cabal
 
 ```haskell-cabal
@@ -546,7 +541,7 @@ version:            1.1.0.0
 synopsis:           Print current MPD song and status as json
 
 -- A longer description of the package.
--- description:
+description: Print currently playing MPD's song metadata and status as JSON
 homepage:           https://codeberg.org/useless-utils/mpd-current-json
 
 -- A URL where users can report bugs.
@@ -562,6 +557,10 @@ category:           Network
 extra-source-files: CHANGELOG.org
                     README.md
 
+source-repository head
+    type:      git
+    location:  https://codeberg.org/useless-utils/mpd-current-json
+
 executable mpd-current-json
     main-is:          Main.hs
 
@@ -569,6 +568,8 @@ executable mpd-current-json
     other-modules:    Options
                       Paths_mpd_current_json
                       Version
+
+    autogen-modules:  Paths_mpd_current_json
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -596,12 +597,11 @@ executable mpd-current-json
                     -Wunused-packages
                     -fwrite-ide-info
                     -hiedir=.hie
-                    -fprof-auto -fprof-cafs
 
 ```
 
 
-<a id="orgd45ec38"></a>
+<a id="org7bcee54"></a>
 
 # Changelog
 
