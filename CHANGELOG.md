@@ -1,3 +1,8 @@
+# v1.1.0.2
+[comment]: # (2023-10-23)
+- Fixed cabal `build-depends` version bounds for Arch Linux dynamic
+  building.
+
 # v1.1.0.1
 [comment]: # (2023-10-17)
 - Added haddock comments
