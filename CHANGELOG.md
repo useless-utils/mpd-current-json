@@ -2,6 +2,10 @@
 - Move literate Org Mode code to LITERATE.org file
 - Move functions from executable source Main.hs to their own library
 - Bump dependency versions for `aeson` and `bytestring`
+- Changed status.state from "play" to "playing" and "pause" to
+  "paused".  
+  The reason why it was "play" and "pause" before was because
+  that was the socket answer string.
 
 # v1.1.0.2
 [comment]: # (2023-10-23)
