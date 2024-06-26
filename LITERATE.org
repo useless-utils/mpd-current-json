@@ -19,7 +19,7 @@ module Main ( main ) where
 
 **** Imports
 Import for the ~libmpd~ library, added as ~libmpd == 0.10.*~ to
-[[*mpd-current-json.cabal][mpd-current-json.cabal]].
+[[#orgid-tkwglz][mpd-current-json.cabal]].
 #+begin_src haskell
 import qualified Network.MPD as MPD
 import Network.MPD
@@ -60,8 +60,7 @@ Parse the command-line options and bind the result to =opts=.
 #+end_src
 
 Connect to MPD using either the provided arguments from the
-command-line or the default values, as defined in [[*=Parser Opts= definition][​=Parser Opts=
-definition]].
+command-line or the default values, as defined in [[#orgid-pkjqgp][~Parser Opts~ definition]].
 #+begin_src haskell
   cs <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.currentSong
   st <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.status
@@ -321,6 +320,9 @@ import Data.Kind (Type)
 #+end_src
 
 **** Data record for holding parsed 'Parser' values
+:PROPERTIES:
+:CUSTOM_ID: orgid-yiypwm
+:END:
 #+begin_src haskell
 data Opts = Opts  -- ^ Custom data record for storing 'Options.Applicative.Parser' values
   { optPort    :: Integer  -- ^ MPD port to connect.
@@ -330,7 +332,10 @@ data Opts = Opts  -- ^ Custom data record for storing 'Options.Applicative.Parse
   }
 #+end_src
 
-**** =Parser Opts= definition
+**** ~Parser Opts~ definition
+:PROPERTIES:
+:CUSTOM_ID: orgid-pkjqgp
+:END:
 #+begin_quote
 A [[https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#t:Parser][Parser]] a is an option parser returning a value of type a.
 #+end_quote
@@ -392,8 +397,8 @@ screen.
 - =optsParserInfo=
 
   Utility function for =Options.Applicative='s "=info=" that create a
-  =ParserInfo= given a [[https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#t:Parser][​=Parser=​]] and a modifier, where =Parser=​s are defined
-  using a [[*Data record for holding parsed 'Parser' values][​custom data record​]].
+  =ParserInfo= given a [[https://hackage.haskell.org/package/optparse-applicative-0.18.1.0/docs/Options-Applicative.html#t:Parser][Parser]] and a modifier, where 'Parser's are defined
+  using a custom [[#orgid-yiypwm][Data record for holding parsed 'Parser' values]].
 #+begin_src haskell
 optsParserInfo :: ParserInfo Opts
 optsParserInfo = info (optsParser <**> helper')
@@ -629,6 +634,7 @@ _   .=? Nothing    = Nothing
 ** mpd-current-json.cabal
 :PROPERTIES:
 :header-args:haskell-cabal+: :tangle mpd-current-json.cabal
+:CUSTOM_ID: orgid-tkwglz
 :END:
 #+begin_src haskell-cabal
 cabal-version:      3.0
