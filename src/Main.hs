@@ -5,8 +5,7 @@ module Main ( main ) where
 import qualified Network.MPD as MPD
 import Network.MPD
        ( Metadata(..), PlaybackState(Stopped, Playing, Paused) )
-import Data.Maybe ( catMaybes )
-import Data.Aeson ( object, KeyValue((.=)), Value )
+import Data.Aeson ( object, KeyValue((.=)) )
 import Data.Aeson.Encode.Pretty
        ( defConfig, encodePretty', keyOrder, Config(confCompare) )
 import qualified Data.ByteString.Lazy.Char8 as C
@@ -17,10 +16,10 @@ import Options
 import Network.MPD.Parse ( getStatusItem
                          , getTag
                          , maybePath
-                         , (.=?) )
+                         , (.=?)
+                         , objectJson )
 
 import Text.Read (readMaybe)
-import Data.Aeson.Types (Pair)
 {- | Where the program connects to MPD and uses the helper functions to
 extract values, organize them into a list of key/value pairs, make
 them a 'Data.Aeson.Value' using 'Data.Aeson.object', then encode it to
@@ -185,9 +184,3 @@ customEncodeConf = defConfig
                            , "error"
                            ]
   }
-
--- | Helper function for creating an JSON 'Data.Aeson.object' where
--- 'Data.Maybe.catMaybes' won't include items from the '[Maybe Pair]'
--- list that return 'Nothing'.
-objectJson :: [Maybe Pair] -> Value
-objectJson = object . catMaybes

@@ -6,12 +6,15 @@ module Network.MPD.Parse
   , headMay
   , valueToStringMay
   , (.=?)
+  , objectJson
   ) where
 
 import qualified Network.MPD as MPD
 import Network.MPD
        ( Metadata(..), Song, PlaybackState(Stopped, Playing, Paused) )
-import Data.Aeson ( Key, KeyValue(..), ToJSON )
+import Data.Aeson ( object, Key, KeyValue(..), ToJSON, Value )
+import Data.Aeson.Types ( Pair )
+import Data.Maybe ( catMaybes )
 
 {- | Extract a field from the returned MPD.Status data record.
 
@@ -104,3 +107,9 @@ not be included in 'Data.Aeson.object' because of
 (.=?) :: (KeyValue e a, ToJSON v) => Key -> Maybe v -> Maybe a
 key .=? Just value = Just (key .= value)
 _   .=? Nothing    = Nothing
+
+-- | Helper function for creating an JSON 'Data.Aeson.object' where
+-- 'Data.Maybe.catMaybes' won't include items from the '[Maybe Pair]'
+-- list that return 'Nothing'.
+objectJson :: [Maybe Pair] -> Value
+objectJson = object . catMaybes

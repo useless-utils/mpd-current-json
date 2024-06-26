@@ -24,8 +24,7 @@ Import for the ~libmpd~ library, added as ~libmpd == 0.10.*~ to
 import qualified Network.MPD as MPD
 import Network.MPD
        ( Metadata(..), PlaybackState(Stopped, Playing, Paused) )
-import Data.Maybe ( catMaybes )
-import Data.Aeson ( object, KeyValue((.=)), Value )
+import Data.Aeson ( object, KeyValue((.=)) )
 import Data.Aeson.Encode.Pretty
        ( defConfig, encodePretty', keyOrder, Config(confCompare) )
 import qualified Data.ByteString.Lazy.Char8 as C
@@ -36,10 +35,10 @@ import Options
 import Network.MPD.Parse ( getStatusItem
                          , getTag
                          , maybePath
-                         , (.=?) )
+                         , (.=?)
+                         , objectJson )
 
 import Text.Read (readMaybe)
-import Data.Aeson.Types (Pair)
 #+end_src
 
 **** Main
@@ -268,15 +267,6 @@ customEncodeConf = defConfig
   }
 #+end_src
 
-#+begin_src haskell
--- | Helper function for creating an JSON 'Data.Aeson.object' where
--- 'Data.Maybe.catMaybes' won't include items from the '[Maybe Pair]'
--- list that return 'Nothing'.
-objectJson :: [Maybe Pair] -> Value
-objectJson = object . catMaybes
-#+end_src
-
-
 *** Options.hs
 :PROPERTIES:
 :header-args:haskell+: :tangle src/Options.hs
@@ -477,12 +467,15 @@ module Network.MPD.Parse
   , headMay
   , valueToStringMay
   , (.=?)
+  , objectJson
   ) where
 
 import qualified Network.MPD as MPD
 import Network.MPD
        ( Metadata(..), Song, PlaybackState(Stopped, Playing, Paused) )
-import Data.Aeson ( Key, KeyValue(..), ToJSON )
+import Data.Aeson ( object, Key, KeyValue(..), ToJSON, Value )
+import Data.Aeson.Types ( Pair )
+import Data.Maybe ( catMaybes )
 #+end_src
 
 The =getStatusItem= function takes an =Either MPD.MPDError MPD.Status=
@@ -630,6 +623,15 @@ key .=? Just value = Just (key .= value)
 _   .=? Nothing    = Nothing
 #+end_src
 
+Encoder helper for filtering list of ~[Maybe Pair]~ key/values.
+#+begin_src haskell
+-- | Helper function for creating an JSON 'Data.Aeson.object' where
+-- 'Data.Maybe.catMaybes' won't include items from the '[Maybe Pair]'
+-- list that return 'Nothing'.
+objectJson :: [Maybe Pair] -> Value
+objectJson = object . catMaybes
+#+end_src
+
 
 ** mpd-current-json.cabal
 :PROPERTIES:
@@ -646,7 +648,7 @@ name:               mpd-current-json
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            1.3.0.0
+version:            1.3.1.0
 synopsis:           Print current MPD song and status as JSON
 
 -- A longer description of the package.
