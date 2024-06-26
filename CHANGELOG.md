@@ -1,9 +1,14 @@
+# v1.3
+- Add `filename` key.
+- Add `playlist` key and move existing keys to it.
+- Customize ordering of displayed output JSON.
+
 # v1.2.0.0
 - Move literate Org Mode code to LITERATE.org file
 - Move functions from executable source Main.hs to their own library
 - Bump dependency versions for `aeson` and `bytestring`
 - Changed status.state from "play" to "playing" and "pause" to
-  "paused".  
+  "paused".
   The reason why it was "play" and "pause" before was because
   that was the socket answer string.
 

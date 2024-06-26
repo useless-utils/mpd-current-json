@@ -183,11 +183,6 @@ customEncodeConf = defConfig
                            , "duration", "elapsed", "elapsed_percent"
                            , "audio_format", "bitrate"
                            , "error"
-                           -- , "filename"
-                           -- , "playlist", "status", "tags"
-                           -- playlist
-                           -- , "position"
-                           -- , "length"
                            ]
   }
 
