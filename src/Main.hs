@@ -6,7 +6,7 @@ import qualified Network.MPD as MPD
 import Network.MPD
        ( Metadata(..), PlaybackState(Stopped, Playing, Paused) )
 import Data.Maybe ( catMaybes )
-import Data.Aeson ( object, KeyValue(..) )
+import Data.Aeson ( object, KeyValue((.=)), Value )
 import Data.Aeson.Encode.Pretty ( encodePretty )
 import qualified Data.ByteString.Lazy.Char8 as C
 import Text.Printf ( printf )
@@ -19,6 +19,7 @@ import Network.MPD.Parse ( getStatusItem
                          , (.=?) )
 
 import Text.Read (readMaybe)
+import Data.Aeson.Types (Pair)
 {- | Where the program connects to MPD and uses the helper functions to
 extract values, organize them into a list of key/value pairs, make
 them a 'Data.Aeson.Value' using 'Data.Aeson.object', then encode it to
@@ -101,7 +102,7 @@ main = do
   let filename = maybePath cs
 
   -- sgTags
-  let jTags = object . catMaybes $
+  let jTags = objectJson
         [ "artist"                     .=? artist
         , "artist_sort"                .=? artistSort
         , "album"                      .=? album
@@ -131,24 +132,37 @@ main = do
         ]
 
   -- status
-  let jStatus = object . catMaybes $
+  let jStatus = objectJson
         [ "state"           .=? state
         , "repeat"          .=? repeatSt
-        , "file"            .=? filename
         , "elapsed"         .=? elapsed
         , "duration"        .=? duration
         , "elapsed_percent" .=? elapsedPercent
         , "random"          .=? randomSt
         , "single"          .=? singleSt
         , "consume"         .=? consumeSt
-        , "song_position"   .=? pos
-        , "playlist_length" .=? playlistLength
         , "bitrate"         .=? bitrate
         , "audio_format"    .=? audioFormat
         , "error"           .=? errorSt
         ]
 
-  let jObject = object [ "tags"   .= jTags
-                       , "status" .= jStatus ]
+  let jFilename = objectJson [ "file" .=? filename ]
+
+  let jPlaylist = objectJson
+        [ "current_position" .=? pos
+        , "length"           .=? playlistLength
+        ]
+
+  let jObject = object [ "filename" .= jFilename
+                       , "playlist" .= jPlaylist
+                       , "status"   .= jStatus
+                       , "tags"     .= jTags
+                       ]
 
   C.putStrLn $ encodePretty jObject
+
+-- | Helper function for creating an JSON 'Data.Aeson.object' where
+-- 'Data.Maybe.catMaybes' won't include items from the '[Maybe Pair]'
+-- list that return 'Nothing'.
+objectJson :: [Maybe Pair] -> Value
+objectJson = object . catMaybes

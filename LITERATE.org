@@ -25,7 +25,7 @@ import qualified Network.MPD as MPD
 import Network.MPD
        ( Metadata(..), PlaybackState(Stopped, Playing, Paused) )
 import Data.Maybe ( catMaybes )
-import Data.Aeson ( object, KeyValue(..) )
+import Data.Aeson ( object, KeyValue((.=)), Value )
 import Data.Aeson.Encode.Pretty ( encodePretty )
 import qualified Data.ByteString.Lazy.Char8 as C
 import Text.Printf ( printf )
@@ -38,6 +38,7 @@ import Network.MPD.Parse ( getStatusItem
                          , (.=?) )
 
 import Text.Read (readMaybe)
+import Data.Aeson.Types (Pair)
 #+end_src
 
 **** Main
@@ -164,7 +165,7 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
 =Data.Aeson='s "=encode=" or =Data.Aeson.Encode.Pretty='s "=encodePretty=".
 #+begin_src haskell
   -- sgTags
-  let jTags = object . catMaybes $
+  let jTags = objectJson
         [ "artist"                     .=? artist
         , "artist_sort"                .=? artistSort
         , "album"                      .=? album
@@ -194,29 +195,36 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
         ]
 
   -- status
-  let jStatus = object . catMaybes $
+  let jStatus = objectJson
         [ "state"           .=? state
         , "repeat"          .=? repeatSt
-        , "file"            .=? filename
         , "elapsed"         .=? elapsed
         , "duration"        .=? duration
         , "elapsed_percent" .=? elapsedPercent
         , "random"          .=? randomSt
         , "single"          .=? singleSt
         , "consume"         .=? consumeSt
-        , "song_position"   .=? pos
-        , "playlist_length" .=? playlistLength
         , "bitrate"         .=? bitrate
         , "audio_format"    .=? audioFormat
         , "error"           .=? errorSt
+        ]
+
+  let jFilename = objectJson [ "file" .=? filename ]
+
+  let jPlaylist = objectJson
+        [ "current_position" .=? pos
+        , "length"           .=? playlistLength
         ]
 #+end_src
 
 Having two objects, one for "tags" and other for "status", create a
 nested JSON with labels before each of them.
 #+begin_src haskell
-  let jObject = object [ "tags"   .= jTags
-                       , "status" .= jStatus ]
+  let jObject = object [ "filename" .= jFilename
+                       , "playlist" .= jPlaylist
+                       , "status"   .= jStatus
+                       , "tags"     .= jTags
+                       ]
 #+end_src
 e.g. so they can be parsed as "=.tags.title=" or
 "=.status.elapsed_percent=".
@@ -228,6 +236,15 @@ that supports =ByteString=​s.
 #+begin_src haskell
   C.putStrLn $ encodePretty jObject
 #+end_src
+
+#+begin_src haskell
+-- | Helper function for creating an JSON 'Data.Aeson.object' where
+-- 'Data.Maybe.catMaybes' won't include items from the '[Maybe Pair]'
+-- list that return 'Nothing'.
+objectJson :: [Maybe Pair] -> Value
+objectJson = object . catMaybes
+#+end_src
+
 
 *** Options.hs
 :PROPERTIES:
@@ -579,7 +596,7 @@ _   .=? Nothing    = Nothing
 
 ** mpd-current-json.cabal
 :PROPERTIES:
-:header-args:haskell-cabal+: :tangle mpd-current-json.cabal :comments none
+:header-args:haskell-cabal+: :tangle mpd-current-json.cabal
 :END:
 #+begin_src haskell-cabal
 cabal-version:      3.0
@@ -591,7 +608,7 @@ name:               mpd-current-json
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            1.2.1.0
+version:            1.3.0.0
 synopsis:           Print current MPD song and status as JSON
 
 -- A longer description of the package.
@@ -642,7 +659,7 @@ executable mpd-current-json
                     , aeson
                     , bytestring >=0.11 && <0.13
                     , aeson-pretty == 0.8.*
-                    , mpd-current-json == 1.2.*
+                    , mpd-current-json == 1.3.*
 
     -- Directories containing source files.
     hs-source-dirs:   src
