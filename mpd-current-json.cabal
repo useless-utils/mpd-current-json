@@ -24,14 +24,14 @@ maintainer:         g@11xx.org
 -- A copyright notice.
 -- copyright:
 category:           Network
-extra-source-files: CHANGELOG.md
+extra-doc-files:    CHANGELOG.md
                     README.org
 
 source-repository head
     type:      git
     location:  https://codeberg.org/useless-utils/mpd-current-json
 
-tested-with: GHC == { 9.4.8 }
+-- tested-with: GHC == 9.4.8
 
 library
     -- exposed: False
