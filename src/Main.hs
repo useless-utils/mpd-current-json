@@ -7,7 +7,8 @@ import Network.MPD
        ( Metadata(..), PlaybackState(Stopped, Playing, Paused) )
 import Data.Maybe ( catMaybes )
 import Data.Aeson ( object, KeyValue((.=)), Value )
-import Data.Aeson.Encode.Pretty ( encodePretty )
+import Data.Aeson.Encode.Pretty
+       ( defConfig, encodePretty', keyOrder, Config(confCompare) )
 import qualified Data.ByteString.Lazy.Char8 as C
 import Text.Printf ( printf )
 import Options
@@ -135,31 +136,60 @@ main = do
   let jStatus = objectJson
         [ "state"           .=? state
         , "repeat"          .=? repeatSt
-        , "elapsed"         .=? elapsed
-        , "duration"        .=? duration
-        , "elapsed_percent" .=? elapsedPercent
         , "random"          .=? randomSt
         , "single"          .=? singleSt
         , "consume"         .=? consumeSt
-        , "bitrate"         .=? bitrate
+        , "duration"        .=? duration
+        , "elapsed"         .=? elapsed
+        , "elapsed_percent" .=? elapsedPercent
         , "audio_format"    .=? audioFormat
+        , "bitrate"         .=? bitrate
         , "error"           .=? errorSt
         ]
 
-  let jFilename = objectJson [ "file" .=? filename ]
+  -- let jFilename = objectJson [ "file" .=? filename ]
 
   let jPlaylist = objectJson
-        [ "current_position" .=? pos
+        [ "position" .=? pos
         , "length"           .=? playlistLength
         ]
 
-  let jObject = object [ "filename" .= jFilename
+  let jObject = object [ "filename" .= filename
                        , "playlist" .= jPlaylist
                        , "status"   .= jStatus
                        , "tags"     .= jTags
                        ]
 
-  C.putStrLn $ encodePretty jObject
+  C.putStrLn $ encodePretty' customEncodeConf jObject
+
+customEncodeConf :: Config
+customEncodeConf = defConfig
+  { confCompare = keyOrder [ "title", "name"
+                           , "artist", "album_artist", "artist_sort", "album_artist_sort"
+                           , "album", "album_sort"
+                           , "track", "disc"
+                           , "date", "original_date"
+                           , "genre", "composer", "performer", "conductor"
+                           , "work", "grouping", "label"
+                           , "comment"
+                           , "musicbrainz_artistid"
+                           , "musicbrainz_albumid"
+                           , "musicbrainz_albumartistid"
+                           , "musicbrainz_trackid"
+                           , "musicbrainz_releasetrackid"
+                           , "musicbrainz_workid"
+                           -- status
+                           , "state", "repeat", "random", "single", "consume"
+                           , "duration", "elapsed", "elapsed_percent"
+                           , "audio_format", "bitrate"
+                           , "error"
+                           -- , "filename"
+                           -- , "playlist", "status", "tags"
+                           -- playlist
+                           -- , "position"
+                           -- , "length"
+                           ]
+  }
 
 -- | Helper function for creating an JSON 'Data.Aeson.object' where
 -- 'Data.Maybe.catMaybes' won't include items from the '[Maybe Pair]'

@@ -26,7 +26,8 @@ import Network.MPD
        ( Metadata(..), PlaybackState(Stopped, Playing, Paused) )
 import Data.Maybe ( catMaybes )
 import Data.Aeson ( object, KeyValue((.=)), Value )
-import Data.Aeson.Encode.Pretty ( encodePretty )
+import Data.Aeson.Encode.Pretty
+       ( defConfig, encodePretty', keyOrder, Config(confCompare) )
 import qualified Data.ByteString.Lazy.Char8 as C
 import Text.Printf ( printf )
 import Options
@@ -100,6 +101,8 @@ calls to be placed in the JSON object later:
       musicbrainz_Releasetrackid = getTag MUSICBRAINZ_RELEASETRACKID cs
       musicbrainz_Workid         = getTag MUSICBRAINZ_WORKID         cs
 #+end_src
+- See the protocol documentation for Tags:
+  + [[https://mpd.readthedocs.io/en/stable/protocol.html#tags][Protocol — Music Player Daemon documentation#Tags]]
 
 Likewise, =getStatusItem= parses values from =Status {...}= returned by
 =status=, some may require additional =Maybe= checks to get the desired
@@ -198,21 +201,21 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
   let jStatus = objectJson
         [ "state"           .=? state
         , "repeat"          .=? repeatSt
-        , "elapsed"         .=? elapsed
-        , "duration"        .=? duration
-        , "elapsed_percent" .=? elapsedPercent
         , "random"          .=? randomSt
         , "single"          .=? singleSt
         , "consume"         .=? consumeSt
-        , "bitrate"         .=? bitrate
+        , "duration"        .=? duration
+        , "elapsed"         .=? elapsed
+        , "elapsed_percent" .=? elapsedPercent
         , "audio_format"    .=? audioFormat
+        , "bitrate"         .=? bitrate
         , "error"           .=? errorSt
         ]
 
-  let jFilename = objectJson [ "file" .=? filename ]
+  -- let jFilename = objectJson [ "file" .=? filename ]
 
   let jPlaylist = objectJson
-        [ "current_position" .=? pos
+        [ "position" .=? pos
         , "length"           .=? playlistLength
         ]
 #+end_src
@@ -220,7 +223,7 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
 Having two objects, one for "tags" and other for "status", create a
 nested JSON with labels before each of them.
 #+begin_src haskell
-  let jObject = object [ "filename" .= jFilename
+  let jObject = object [ "filename" .= filename
                        , "playlist" .= jPlaylist
                        , "status"   .= jStatus
                        , "tags"     .= jTags
@@ -234,7 +237,41 @@ terminal. =Data.Aeson='s encoding is returned as a =ByteString= so use the
 =Data.ByteString...= import that provides an implementation of =putStrLn=
 that supports =ByteString=​s.
 #+begin_src haskell
-  C.putStrLn $ encodePretty jObject
+  C.putStrLn $ encodePretty' customEncodeConf jObject
+#+end_src
+where ~customEncodeConf~ is an override for the
+~Data.Aeson.Encode.Pretty~'s [[https://hackage.haskell.org/package/aeson-pretty-0.8.10/docs/Data-Aeson-Encode-Pretty.html#t:Config][Config]] data record. +This is really
+unnecessary but+ using [[https://hackage.haskell.org/package/aeson-pretty/docs/Data-Aeson-Encode-Pretty.html#v:keyOrder][keyOrder]] it is possible to customize the order
+the encoded JSON bytestring will be displayed as.
+#+begin_src haskell
+customEncodeConf :: Config
+customEncodeConf = defConfig
+  { confCompare = keyOrder [ "title", "name"
+                           , "artist", "album_artist", "artist_sort", "album_artist_sort"
+                           , "album", "album_sort"
+                           , "track", "disc"
+                           , "date", "original_date"
+                           , "genre", "composer", "performer", "conductor"
+                           , "work", "grouping", "label"
+                           , "comment"
+                           , "musicbrainz_artistid"
+                           , "musicbrainz_albumid"
+                           , "musicbrainz_albumartistid"
+                           , "musicbrainz_trackid"
+                           , "musicbrainz_releasetrackid"
+                           , "musicbrainz_workid"
+                           -- status
+                           , "state", "repeat", "random", "single", "consume"
+                           , "duration", "elapsed", "elapsed_percent"
+                           , "audio_format", "bitrate"
+                           , "error"
+                           -- , "filename"
+                           -- , "playlist", "status", "tags"
+                           -- playlist
+                           -- , "position"
+                           -- , "length"
+                           ]
+  }
 #+end_src
 
 #+begin_src haskell
