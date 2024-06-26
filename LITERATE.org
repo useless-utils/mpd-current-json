@@ -33,8 +33,11 @@ import Options
     ( optsParserInfo, execParser, Opts(optPass, optHost, optPort) )
 
 import Network.MPD.Parse ( getStatusItem
-                             , getTag
-                             , (.=?) )
+                         , getTag
+                         , maybePath
+                         , (.=?) )
+
+import Text.Read (readMaybe)
 #+end_src
 
 **** Main
@@ -114,20 +117,20 @@ values.
       elapsed = case time of
         Just t -> case t of
                     Just (e, _) -> Just e
-                    _           -> Nothing
+                    _noTag      -> Nothing
         Nothing -> Nothing
 
       duration = case time of
         Just t -> case t of
                     Just (_, d) -> Just d
-                    _           -> Nothing
+                    _noTag      -> Nothing
         Nothing -> Nothing
 
       elapsedPercent :: Maybe Double
       elapsedPercent = case time of
         Just t -> case t of
-                    Just t1 -> Just (read $ printf "%.2f" (uncurry (/) t1 * 100))
-                    Nothing -> Just 0
+                   Just t1 -> readMaybe $ printf "%.2f" (uncurry (/) t1 * 100)
+                   Nothing -> Just 0
         Nothing -> Nothing
 
       repeatSt       = getStatusItem st MPD.stRepeat
@@ -139,6 +142,8 @@ values.
       bitrate        = getStatusItem st MPD.stBitrate
       audioFormat    = getStatusItem st MPD.stAudio
       errorSt        = getStatusItem st MPD.stError
+
+  let filename = maybePath cs
 #+end_src
 
 # Create the first JSON object that contains all the extracted =sgTags=
@@ -192,6 +197,7 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
   let jStatus = object . catMaybes $
         [ "state"           .=? state
         , "repeat"          .=? repeatSt
+        , "file"            .=? filename
         , "elapsed"         .=? elapsed
         , "duration"        .=? duration
         , "elapsed_percent" .=? elapsedPercent
@@ -413,6 +419,7 @@ module Network.MPD.Parse
   ( getStatusItem
   , getTag
   , processSong
+  , maybePath
   , headMay
   , valueToStringMay
   , (.=?)
@@ -486,6 +493,17 @@ processSong tag (Just song) = do
   let tagVal = MPD.sgGetTag tag song
   valueToStringMay =<< (headMay =<< tagVal)
 #+end_src
+
+
+#+begin_src haskell
+maybePath :: Either a (Maybe Song) -> Maybe String
+maybePath cs =
+  case cs of
+    Left _ -> Nothing
+    Right Nothing -> Nothing
+    Right (Just song) -> Just $ MPD.toString $ MPD.sgFilePath song
+#+end_src
+
 
 The =headMay= function is a utility function that safely gets the head
 of a list. It takes a list as input and returns =Nothing= if the list is
@@ -573,7 +591,7 @@ name:               mpd-current-json
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            1.2.0.0
+version:            1.2.1.0
 synopsis:           Print current MPD song and status as JSON
 
 -- A longer description of the package.

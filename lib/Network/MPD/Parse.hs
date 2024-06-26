@@ -2,6 +2,7 @@ module Network.MPD.Parse
   ( getStatusItem
   , getTag
   , processSong
+  , maybePath
   , headMay
   , valueToStringMay
   , (.=?)
@@ -45,6 +46,13 @@ processSong _ Nothing = Nothing
 processSong tag (Just song) = do
   let tagVal = MPD.sgGetTag tag song
   valueToStringMay =<< (headMay =<< tagVal)
+
+maybePath :: Either a (Maybe Song) -> Maybe String
+maybePath cs =
+  case cs of
+    Left _ -> Nothing
+    Right Nothing -> Nothing
+    Right (Just song) -> Just $ MPD.toString $ MPD.sgFilePath song
 
 {- | Safely get the head of a list. Same as [Safe.headMay](Safe#headMay).
 -}

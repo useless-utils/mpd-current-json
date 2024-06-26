@@ -14,8 +14,11 @@ import Options
     ( optsParserInfo, execParser, Opts(optPass, optHost, optPort) )
 
 import Network.MPD.Parse ( getStatusItem
-                             , getTag
-                             , (.=?) )
+                         , getTag
+                         , maybePath
+                         , (.=?) )
+
+import Text.Read (readMaybe)
 {- | Where the program connects to MPD and uses the helper functions to
 extract values, organize them into a list of key/value pairs, make
 them a 'Data.Aeson.Value' using 'Data.Aeson.object', then encode it to
@@ -69,20 +72,20 @@ main = do
       elapsed = case time of
         Just t -> case t of
                     Just (e, _) -> Just e
-                    _           -> Nothing
+                    _noTag      -> Nothing
         Nothing -> Nothing
 
       duration = case time of
         Just t -> case t of
                     Just (_, d) -> Just d
-                    _           -> Nothing
+                    _noTag      -> Nothing
         Nothing -> Nothing
 
       elapsedPercent :: Maybe Double
       elapsedPercent = case time of
         Just t -> case t of
-                    Just t1 -> Just (read $ printf "%.2f" (uncurry (/) t1 * 100))
-                    Nothing -> Just 0
+                   Just t1 -> readMaybe $ printf "%.2f" (uncurry (/) t1 * 100)
+                   Nothing -> Just 0
         Nothing -> Nothing
 
       repeatSt       = getStatusItem st MPD.stRepeat
@@ -94,6 +97,8 @@ main = do
       bitrate        = getStatusItem st MPD.stBitrate
       audioFormat    = getStatusItem st MPD.stAudio
       errorSt        = getStatusItem st MPD.stError
+
+  let filename = maybePath cs
 
   -- sgTags
   let jTags = object . catMaybes $
@@ -129,6 +134,7 @@ main = do
   let jStatus = object . catMaybes $
         [ "state"           .=? state
         , "repeat"          .=? repeatSt
+        , "file"            .=? filename
         , "elapsed"         .=? elapsed
         , "duration"        .=? duration
         , "elapsed_percent" .=? elapsedPercent
