@@ -2,6 +2,7 @@
 - Add `filename` key.
 - Add `playlist` key and move existing keys to it.
 - Customize ordering of displayed output JSON.
+- Add cabal tested-with GHC versions
 
 # v1.2.0.0
 - Move literate Org Mode code to LITERATE.org file
