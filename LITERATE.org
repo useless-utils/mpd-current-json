@@ -67,8 +67,9 @@ command-line or the default values, as defined in [[#orgid-pkjqgp][~Parser Opts~
   cs <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.currentSong
   st <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.status
 #+end_src
-where =currentSong= returns a =Either (Just (Song {...}))= and =status=
+where =currentSong= returns a =Either (Maybe (Song {...}))= and =status=
 returns =Either (Status {...})= to be parsed.
+- See =base= Prelude's documentation for [[https://hackage.haskell.org/package/base/docs/Prelude.html#t:Either][Either]] and [[https://hackage.haskell.org/package/base/docs/Prelude.html#t:Maybe][Maybe]].
 
 The data record =Song= from the command =currentSong= contains a field
 label "=sgTags=" that contains all embedded metadata tags in a
