@@ -93,11 +93,12 @@ main = do
       randomSt       = getStatusItem st MPD.stRandom
       singleSt       = getStatusItem st MPD.stSingle
       consumeSt      = getStatusItem st MPD.stConsume
-      pos            = getStatusItem st MPD.stSongPos
-      playlistLength = getStatusItem st MPD.stPlaylistLength
       bitrate        = getStatusItem st MPD.stBitrate
       audioFormat    = getStatusItem st MPD.stAudio
       errorSt        = getStatusItem st MPD.stError
+
+  let pos            = getStatusItem st MPD.stSongPos
+      playlistLength = getStatusItem st MPD.stPlaylistLength
 
   let filename = maybePath cs
 
