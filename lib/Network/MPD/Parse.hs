@@ -7,6 +7,7 @@ module Network.MPD.Parse
   , valueToStringMay
   , (.=?)
   , objectJson
+  , getStatusIdInt
   ) where
 
 import qualified Network.MPD as MPD
@@ -14,7 +15,7 @@ import Network.MPD
        ( Metadata(..), Song, PlaybackState(Stopped, Playing, Paused) )
 import Data.Aeson ( object, Key, KeyValue(..), ToJSON, Value )
 import Data.Aeson.Types ( Pair )
-import Data.Maybe ( catMaybes )
+import Data.Maybe ( catMaybes, fromMaybe )
 
 {- | Extract a field from the returned MPD.Status data record.
 
@@ -113,3 +114,13 @@ _   .=? Nothing    = Nothing
 -- list that return 'Nothing'.
 objectJson :: [Maybe Pair] -> Value
 objectJson = object . catMaybes
+
+-- | Extracts the 'Int' value from an 'MPD.Id' within 'MPD.Status', if
+-- present and the 'Either' value is a 'Right'.
+getStatusIdInt :: (MPD.Status -> Maybe MPD.Id) -> Either MPD.MPDError MPD.Status -> Maybe Int
+getStatusIdInt item status =
+  case m of
+    Just (MPD.Id int) -> Just int
+    Nothing -> Nothing
+  where
+    m = fromMaybe Nothing $ getStatusItem status item

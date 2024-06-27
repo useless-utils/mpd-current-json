@@ -36,9 +36,12 @@ import Network.MPD.Parse ( getStatusItem
                          , getTag
                          , maybePath
                          , (.=?)
-                         , objectJson )
+                         , objectJson
+                         , getStatusIdInt )
 
 import Text.Read (readMaybe)
+
+import Data.Maybe (fromMaybe)
 #+end_src
 
 **** Main
@@ -143,7 +146,11 @@ values.
       audioFormat    = getStatusItem st MPD.stAudio
       errorSt        = getStatusItem st MPD.stError
 
+  -- positon is an index starting from 0. Id starts from 1
   let pos            = getStatusItem st MPD.stSongPos
+      nextPos        = fromMaybe Nothing $ getStatusItem st MPD.stNextSongPos
+      songId         = getStatusIdInt MPD.stSongID st
+      nextId         = getStatusIdInt MPD.stNextSongID st
       playlistLength = getStatusItem st MPD.stPlaylistLength
 
   let filename = maybePath cs
@@ -214,8 +221,11 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
   -- let jFilename = objectJson [ "file" .=? filename ]
 
   let jPlaylist = objectJson
-        [ "position" .=? pos
-        , "length"           .=? playlistLength
+        [ "position"      .=? pos  -- current song position
+        , "next_position" .=? nextPos
+        , "id"            .=? songId  -- current song id
+        , "next_id"       .=? nextId
+        , "length"        .=? playlistLength
         ]
 #+end_src
 
@@ -264,6 +274,9 @@ customEncodeConf = defConfig
                            , "duration", "elapsed", "elapsed_percent"
                            , "audio_format", "bitrate"
                            , "error"
+                           -- playlist
+                           , "position", "next_position", "id", "next_id"
+                           , "length"
                            ]
   }
 #+end_src
@@ -469,6 +482,7 @@ module Network.MPD.Parse
   , valueToStringMay
   , (.=?)
   , objectJson
+  , getStatusIdInt
   ) where
 
 import qualified Network.MPD as MPD
@@ -476,7 +490,7 @@ import Network.MPD
        ( Metadata(..), Song, PlaybackState(Stopped, Playing, Paused) )
 import Data.Aeson ( object, Key, KeyValue(..), ToJSON, Value )
 import Data.Aeson.Types ( Pair )
-import Data.Maybe ( catMaybes )
+import Data.Maybe ( catMaybes, fromMaybe )
 #+end_src
 
 The =getStatusItem= function takes an =Either MPD.MPDError MPD.Status=
@@ -633,6 +647,22 @@ objectJson :: [Maybe Pair] -> Value
 objectJson = object . catMaybes
 #+end_src
 
+Get the ~Int~ from ~MPD.status~'s ~Either (Status {...})~ fields that use
+the ~MPD.Id~ wrapper: ~stSongID~ and ~stNextSongID~. The current song ID is
+also available in the response from ~MPD.currentSong~ as
+~Either (Maybe (Song {sgId}))~.
+#+begin_src haskell
+-- | Extracts the 'Int' value from an 'MPD.Id' within 'MPD.Status', if
+-- present and the 'Either' value is a 'Right'.
+getStatusIdInt :: (MPD.Status -> Maybe MPD.Id) -> Either MPD.MPDError MPD.Status -> Maybe Int
+getStatusIdInt item status =
+  case m of
+    Just (MPD.Id int) -> Just int
+    Nothing -> Nothing
+  where
+    m = fromMaybe Nothing $ getStatusItem status item
+#+end_src
+
 
 ** mpd-current-json.cabal
 :PROPERTIES:
@@ -725,6 +755,12 @@ executable mpd-current-json
 
 * Changelog
 #+begin_src markdown :tangle CHANGELOG.md
+# v1.3.2
+- Add "`next_position`", "`id`" and "`next_id`" keys to `playlist`.
+
+# v1.3.1
+- Move helper function `objectJson` to lib
+
 # v1.3
 - Add `filename` key.
 - Add `playlist` key and move existing keys to it.

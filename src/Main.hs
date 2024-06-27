@@ -17,9 +17,12 @@ import Network.MPD.Parse ( getStatusItem
                          , getTag
                          , maybePath
                          , (.=?)
-                         , objectJson )
+                         , objectJson
+                         , getStatusIdInt )
 
 import Text.Read (readMaybe)
+
+import Data.Maybe (fromMaybe)
 {- | Where the program connects to MPD and uses the helper functions to
 extract values, organize them into a list of key/value pairs, make
 them a 'Data.Aeson.Value' using 'Data.Aeson.object', then encode it to
@@ -97,7 +100,11 @@ main = do
       audioFormat    = getStatusItem st MPD.stAudio
       errorSt        = getStatusItem st MPD.stError
 
+  -- positon is an index starting from 0. Id starts from 1
   let pos            = getStatusItem st MPD.stSongPos
+      nextPos        = fromMaybe Nothing $ getStatusItem st MPD.stNextSongPos
+      songId         = getStatusIdInt MPD.stSongID st
+      nextId         = getStatusIdInt MPD.stNextSongID st
       playlistLength = getStatusItem st MPD.stPlaylistLength
 
   let filename = maybePath cs
@@ -150,8 +157,11 @@ main = do
   -- let jFilename = objectJson [ "file" .=? filename ]
 
   let jPlaylist = objectJson
-        [ "position" .=? pos
-        , "length"           .=? playlistLength
+        [ "position"      .=? pos  -- current song position
+        , "next_position" .=? nextPos
+        , "id"            .=? songId  -- current song id
+        , "next_id"       .=? nextId
+        , "length"        .=? playlistLength
         ]
 
   let jObject = object [ "filename" .= filename
@@ -183,5 +193,8 @@ customEncodeConf = defConfig
                            , "duration", "elapsed", "elapsed_percent"
                            , "audio_format", "bitrate"
                            , "error"
+                           -- playlist
+                           , "position", "next_position", "id", "next_id"
+                           , "length"
                            ]
   }

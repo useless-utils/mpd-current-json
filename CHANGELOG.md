@@ -1,3 +1,9 @@
+# v1.3.2
+- Add "`next_position`", "`id`" and "`next_id`" keys to `playlist`.
+
+# v1.3.1
+- Move helper function `objectJson` to lib
+
 # v1.3
 - Add `filename` key.
 - Add `playlist` key and move existing keys to it.
