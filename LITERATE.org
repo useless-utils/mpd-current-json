@@ -34,7 +34,8 @@ import Options
 
 import Network.MPD.Parse ( getStatusItem
                          , getTag
-                         , maybePath
+                         , maybePathCurrentSong
+                         , maybePathNextPlaylistSong
                          , (.=?)
                          , objectJson
                          , getStatusIdInt )
@@ -64,8 +65,9 @@ Parse the command-line options and bind the result to =opts=.
 Connect to MPD using either the provided arguments from the
 command-line or the default values, as defined in [[#orgid-pkjqgp][~Parser Opts~ definition]].
 #+begin_src haskell
-  cs <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.currentSong
-  st <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.status
+  let withMpdOpts = MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts)
+  cs <- withMpdOpts MPD.currentSong
+  st <- withMpdOpts MPD.status
 #+end_src
 where =currentSong= returns a =Either (Maybe (Song {...}))= and =status=
 returns =Either (Status {...})= to be parsed.
@@ -154,7 +156,9 @@ values.
       nextId         = getStatusIdInt MPD.stNextSongID st
       playlistLength = getStatusItem st MPD.stPlaylistLength
 
-  let filename = maybePath cs
+  nextPlaylistSong <- withMpdOpts $ MPD.playlistInfo nextId
+  let filename = maybePathCurrentSong cs
+      filenameNext = maybePathNextPlaylistSong nextPlaylistSong
 #+end_src
 
 # Create the first JSON object that contains all the extracted =sgTags=
@@ -233,10 +237,11 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
 Having two objects, one for "tags" and other for "status", create a
 nested JSON with labels before each of them.
 #+begin_src haskell
-  let jObject = object [ "filename" .= filename
-                       , "playlist" .= jPlaylist
-                       , "status"   .= jStatus
-                       , "tags"     .= jTags
+  let jObject = object [ "filename"      .= filename
+                       , "next_filename" .= filenameNext
+                       , "playlist"      .= jPlaylist
+                       , "status"        .= jStatus
+                       , "tags"          .= jTags
                        ]
 #+end_src
 e.g. so they can be parsed as "=.tags.title=" or
@@ -478,7 +483,8 @@ module Network.MPD.Parse
   ( getStatusItem
   , getTag
   , processSong
-  , maybePath
+  , maybePathCurrentSong
+  , maybePathNextPlaylistSong
   , headMay
   , valueToStringMay
   , (.=?)
@@ -559,12 +565,24 @@ processSong tag (Just song) = do
 
 
 #+begin_src haskell
-maybePath :: Either a (Maybe Song) -> Maybe String
-maybePath cs =
+{- | Get the current 'Network.MPD.Song' relative path with 'Network.MPD.sgFilePath'
+-}
+maybePathCurrentSong :: MPD.Response (Maybe Song) -> Maybe String
+maybePathCurrentSong cs =
   case cs of
     Left _ -> Nothing
     Right Nothing -> Nothing
     Right (Just song) -> Just $ MPD.toString $ MPD.sgFilePath song
+
+{- | Get the next song's relative path in the current playlist.
+
+Using 'Network.MPD.sgFilePath' from the returned 'Network.MPD.Response' @[Song]@.
+-}
+maybePathNextPlaylistSong :: MPD.Response [Song] -> Maybe String
+maybePathNextPlaylistSong (Left _)        = Nothing
+maybePathNextPlaylistSong (Right [])      = Nothing
+maybePathNextPlaylistSong (Right (_:_:_)) = Nothing
+maybePathNextPlaylistSong (Right [s]) =  Just $ MPD.toString $ MPD.sgFilePath s
 #+end_src
 
 
@@ -680,7 +698,7 @@ name:               mpd-current-json
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            1.3.2.0
+version:            1.4.0.0
 synopsis:           Print current MPD song and status as JSON
 
 -- A longer description of the package.
@@ -733,7 +751,7 @@ executable mpd-current-json
                     , aeson
                     , bytestring >=0.11 && <0.13
                     , aeson-pretty == 0.8.*
-                    , mpd-current-json == 1.3.*
+                    , mpd-current-json == 1.4.*
 
     -- Directories containing source files.
     hs-source-dirs:   src
@@ -756,6 +774,10 @@ executable mpd-current-json
 
 * Changelog
 #+begin_src markdown :tangle CHANGELOG.md
+# v1.4.0
+- Add "`next_filename`" for getting next song file URI relative to the
+  music library.
+
 # v1.3.2
 - Add "`next_position`", "`id`" and "`next_id`" keys to `playlist`.
 

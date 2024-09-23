@@ -2,7 +2,8 @@ module Network.MPD.Parse
   ( getStatusItem
   , getTag
   , processSong
-  , maybePath
+  , maybePathCurrentSong
+  , maybePathNextPlaylistSong
   , headMay
   , valueToStringMay
   , (.=?)
@@ -51,12 +52,24 @@ processSong tag (Just song) = do
   let tagVal = MPD.sgGetTag tag song
   valueToStringMay =<< (headMay =<< tagVal)
 
-maybePath :: Either a (Maybe Song) -> Maybe String
-maybePath cs =
+{- | Get the current 'Network.MPD.Song' relative path with 'Network.MPD.sgFilePath'
+-}
+maybePathCurrentSong :: MPD.Response (Maybe Song) -> Maybe String
+maybePathCurrentSong cs =
   case cs of
     Left _ -> Nothing
     Right Nothing -> Nothing
     Right (Just song) -> Just $ MPD.toString $ MPD.sgFilePath song
+
+{- | Get the next song's relative path in the current playlist.
+
+Using 'Network.MPD.sgFilePath' from the returned 'Network.MPD.Response' @[Song]@.
+-}
+maybePathNextPlaylistSong :: MPD.Response [Song] -> Maybe String
+maybePathNextPlaylistSong (Left _)        = Nothing
+maybePathNextPlaylistSong (Right [])      = Nothing
+maybePathNextPlaylistSong (Right (_:_:_)) = Nothing
+maybePathNextPlaylistSong (Right [s]) =  Just $ MPD.toString $ MPD.sgFilePath s
 
 {- | Safely get the head of a list. Same as [Safe.headMay](Safe#headMay).
 -}

@@ -15,7 +15,8 @@ import Options
 
 import Network.MPD.Parse ( getStatusItem
                          , getTag
-                         , maybePath
+                         , maybePathCurrentSong
+                         , maybePathNextPlaylistSong
                          , (.=?)
                          , objectJson
                          , getStatusIdInt )
@@ -33,8 +34,9 @@ main :: IO ()
 main = do
   opts <- execParser optsParserInfo
 
-  cs <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.currentSong
-  st <- MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts) MPD.status
+  let withMpdOpts = MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts)
+  cs <- withMpdOpts MPD.currentSong
+  st <- withMpdOpts MPD.status
 
   let artist                     = getTag Artist                     cs
       artistSort                 = getTag ArtistSort                 cs
@@ -107,7 +109,9 @@ main = do
       nextId         = getStatusIdInt MPD.stNextSongID st
       playlistLength = getStatusItem st MPD.stPlaylistLength
 
-  let filename = maybePath cs
+  nextPlaylistSong <- withMpdOpts $ MPD.playlistInfo nextId
+  let filename = maybePathCurrentSong cs
+      filenameNext = maybePathNextPlaylistSong nextPlaylistSong
 
   -- sgTags
   let jTags = objectJson
@@ -164,10 +168,11 @@ main = do
         , "length"        .=? playlistLength
         ]
 
-  let jObject = object [ "filename" .= filename
-                       , "playlist" .= jPlaylist
-                       , "status"   .= jStatus
-                       , "tags"     .= jTags
+  let jObject = object [ "filename"      .= filename
+                       , "next_filename" .= filenameNext
+                       , "playlist"      .= jPlaylist
+                       , "status"        .= jStatus
+                       , "tags"          .= jTags
                        ]
 
   C.putStrLn $ encodePretty' customEncodeConf jObject

@@ -1,3 +1,7 @@
+# v1.4.0
+- Add "`next_filename`" for getting next song file URI relative to the
+  music library.
+
 # v1.3.2
 - Add "`next_position`", "`id`" and "`next_id`" keys to `playlist`.
 
