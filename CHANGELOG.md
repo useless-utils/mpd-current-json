@@ -1,3 +1,11 @@
+# v2.0
+- Add command-line flags:
+  - `-n`: is an alias for `--next`
+  - `-nn`: is an alias for `--next-only`
+  - `--next`: Include information about the next queued song in the
+    output JSON.
+  - `--next-only`: Print only the next queued song's information.
+
 # v1.5
 - Add json keys
   - `volume`: Integer for volume percentage
