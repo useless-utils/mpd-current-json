@@ -57,12 +57,12 @@ main = do
       comment                    = getTag Comment                    cs
       disc                       = getTag Disc                       cs
       label                      = getTag Label                      cs
-      musicbrainz_Artistid       = getTag MUSICBRAINZ_ARTISTID       cs
-      musicbrainz_Albumid        = getTag MUSICBRAINZ_ALBUMID        cs
-      musicbrainz_Albumartistid  = getTag MUSICBRAINZ_ALBUMARTISTID  cs
-      musicbrainz_Trackid        = getTag MUSICBRAINZ_TRACKID        cs
-      musicbrainz_Releasetrackid = getTag MUSICBRAINZ_RELEASETRACKID cs
-      musicbrainz_Workid         = getTag MUSICBRAINZ_WORKID         cs
+      musicbrainz_ArtistId       = getTag MUSICBRAINZ_ARTISTID       cs
+      musicbrainz_AlbumId        = getTag MUSICBRAINZ_ALBUMID        cs
+      musicbrainz_AlbumartistId  = getTag MUSICBRAINZ_ALBUMARTISTID  cs
+      musicbrainz_TrackId        = getTag MUSICBRAINZ_TRACKID        cs
+      musicbrainz_ReleasetrackId = getTag MUSICBRAINZ_RELEASETRACKID cs
+      musicbrainz_WorkId         = getTag MUSICBRAINZ_WORKID         cs
 
   let state :: Maybe String
       state = case getStatusField st MPD.stState of
@@ -137,12 +137,12 @@ main = do
         , "comment"                    .=? comment
         , "disc"                       .=? disc
         , "label"                      .=? label
-        , "musicbrainz_artistid"       .=? musicbrainz_Artistid
-        , "musicbrainz_albumid"        .=? musicbrainz_Albumid
-        , "musicbrainz_albumartistid"  .=? musicbrainz_Albumartistid
-        , "musicbrainz_trackid"        .=? musicbrainz_Trackid
-        , "musicbrainz_releasetrackid" .=? musicbrainz_Releasetrackid
-        , "musicbrainz_workid"         .=? musicbrainz_Workid
+        , "musicbrainz_artistid"       .=? musicbrainz_ArtistId
+        , "musicbrainz_albumid"        .=? musicbrainz_AlbumId
+        , "musicbrainz_albumartistid"  .=? musicbrainz_AlbumartistId
+        , "musicbrainz_trackid"        .=? musicbrainz_TrackId
+        , "musicbrainz_releasetrackid" .=? musicbrainz_ReleasetrackId
+        , "musicbrainz_workid"         .=? musicbrainz_WorkId
         ]
 
   -- status
