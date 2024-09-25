@@ -13,7 +13,8 @@ import Text.Printf ( printf )
 import Options
     ( optsParserInfo, execParser, Opts(optPass, optHost, optPort) )
 
-import Network.MPD.Parse ( getStatusItem
+import Network.MPD.Parse ( getStatusField
+                         , getStatusFieldElement
                          , getTag
                          , maybePathCurrentSong
                          , maybePathNextPlaylistSong
@@ -22,8 +23,6 @@ import Network.MPD.Parse ( getStatusItem
                          , getStatusIdInt )
 
 import Text.Read (readMaybe)
-
-import Data.Maybe (fromMaybe)
 {- | Where the program connects to MPD and uses the helper functions to
 extract values, organize them into a list of key/value pairs, make
 them a 'Data.Aeson.Value' using 'Data.Aeson.object', then encode it to
@@ -66,48 +65,51 @@ main = do
       musicbrainz_Workid         = getTag MUSICBRAINZ_WORKID         cs
 
   let state :: Maybe String
-      state = case getStatusItem st MPD.stState of
+      state = case getStatusField st MPD.stState of
                 Just ps -> case ps of
                              Playing -> Just "playing"
                              Paused  -> Just "paused"
                              Stopped -> Just "stopped"
                 Nothing -> Nothing
 
-      time = getStatusItem st MPD.stTime
-
-      elapsed = case time of
-        Just t -> case t of
-                    Just (e, _) -> Just e
-                    _noTag      -> Nothing
-        Nothing -> Nothing
-
-      duration = case time of
-        Just t -> case t of
-                    Just (_, d) -> Just d
-                    _noTag      -> Nothing
-        Nothing -> Nothing
+      time = getStatusFieldElement st MPD.stTime
+      elapsed = fst <$> time
+      duration = snd <$> time
 
       elapsedPercent :: Maybe Double
       elapsedPercent = case time of
-        Just t -> case t of
-                   Just t1 -> readMaybe $ printf "%.2f" (uncurry (/) t1 * 100)
-                   Nothing -> Just 0
-        Nothing -> Nothing
+        Just t1 -> readMaybe $ printf "%.2f" (uncurry (/) t1 * 100)
+        Nothing -> Just 0.0
 
-      repeatSt       = getStatusItem st MPD.stRepeat
-      randomSt       = getStatusItem st MPD.stRandom
-      singleSt       = getStatusItem st MPD.stSingle
-      consumeSt      = getStatusItem st MPD.stConsume
-      bitrate        = getStatusItem st MPD.stBitrate
-      audioFormat    = getStatusItem st MPD.stAudio
-      errorSt        = getStatusItem st MPD.stError
+      volumeSt :: Maybe Int
+      volumeSt = fromIntegral <$> getStatusFieldElement st MPD.stVolume
+
+      repeatSt       = getStatusField st MPD.stRepeat
+      randomSt       = getStatusField st MPD.stRandom
+      singleSt       = getStatusField st MPD.stSingle
+      consumeSt      = getStatusField st MPD.stConsume
+      bitrate        = getStatusField st MPD.stBitrate
+      audioFormat    = getStatusField st MPD.stAudio
+      errorSt        = getStatusField st MPD.stError
+
+      updatingDbSt   = isJust updatingDbMaybe
+        where
+          updatingDbMaybe = getStatusFieldElement st MPD.stUpdatingDb -- "Nothing" or "Just 1"
+          isJust Nothing = Nothing
+          isJust _       = Just True
+
+      crossfadeSt :: Maybe Int
+      crossfadeSt = fromIntegral <$> getStatusField st MPD.stXFadeWidth
+
+      mixRampDbSt = getStatusField st MPD.stMixRampdB
+      mixRampDelay = getStatusField st MPD.stMixRampDelay
 
   -- positon is an index starting from 0. Id starts from 1
-  let pos            = getStatusItem st MPD.stSongPos
-      nextPos        = fromMaybe Nothing $ getStatusItem st MPD.stNextSongPos
+  let pos            = getStatusField st MPD.stSongPos
+      nextPos        = getStatusFieldElement st MPD.stNextSongPos
       songId         = getStatusIdInt MPD.stSongID st
       nextId         = getStatusIdInt MPD.stNextSongID st
-      playlistLength = getStatusItem st MPD.stPlaylistLength
+      playlistLength = getStatusField st MPD.stPlaylistLength
 
   nextPlaylistSong <- withMpdOpts $ MPD.playlistInfo nextId
   let filename = maybePathCurrentSong cs
@@ -153,8 +155,13 @@ main = do
         , "duration"        .=? duration
         , "elapsed"         .=? elapsed
         , "elapsed_percent" .=? elapsedPercent
+        , "volume"          .=? volumeSt
         , "audio_format"    .=? audioFormat
         , "bitrate"         .=? bitrate
+        , "crossfade"       .=? crossfadeSt
+        , "mixramp_db"      .=? mixRampDbSt
+        , "mixramp_delay"   .=? mixRampDelay
+        , "updating_db"     .=? updatingDbSt
         , "error"           .=? errorSt
         ]
 
@@ -196,7 +203,9 @@ customEncodeConf = defConfig
                            -- status
                            , "state", "repeat", "random", "single", "consume"
                            , "duration", "elapsed", "elapsed_percent"
-                           , "audio_format", "bitrate"
+                           , "volume", "audio_format", "bitrate"
+                           , "crossfade", "mixramp_db", "mixramp_delay"
+                           , "updating_db"
                            , "error"
                            -- playlist
                            , "position", "next_position", "id", "next_id"

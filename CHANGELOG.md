@@ -1,3 +1,12 @@
+# v1.5
+- Add json keys
+  - `volume`: Integer for volume percentage
+  - `crossfade`: Integer seconds of crossfase
+  - `mixramp_db`: Decibels for MixRamp, can use float (decimals) number
+  - `mixramp_delay`: Seconds of delay for MixRamp, can use float number
+  - `updating_db`: Returns `true` when updading, not present otherwise
+- More code refactoring, prepping for v2 for more abstractions :p
+
 # v1.4.0
 - Add "`next_filename`" for getting next song file URI relative to the
   music library.

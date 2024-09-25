@@ -1,5 +1,6 @@
 module Network.MPD.Parse
-  ( getStatusItem
+  ( getStatusField
+  , getStatusFieldElement
   , getTag
   , processSong
   , maybePathCurrentSong
@@ -20,18 +21,39 @@ import Data.Maybe ( catMaybes, fromMaybe )
 
 {- | Extract a field from the returned MPD.Status data record.
 
-This takes an @Either@ 'Network.MPD.MPDError' 'Network.MPD.Status'
-value and a field label function @f@ as arguments. It returns @Just
-(f st)@ if the input status is @Right st@, where @st@ is the
-'Network.MPD.Status' value. This function helps to extract a
-specific field from the @MPD.Status@ data record by providing the
-corresponding field label function.  If the input status "@st@" is
-not @Right st@, indicating an error, or the field label function is
-not applicable, it returns @Nothing@.
+Helper to extract a specific field from the
+[Network.MPD.Status](Network.MPD#Status) data record by providing the
+corresponding field label. If the input status "@st@" is /not/ @Right a@,
+indicating an error, or the field label function is not applicable, it
+returns @Nothing@.
+
+==== __Example__:
+
+@
+ghci> import qualified Network.MPD as MPD
+ghci> st <- MPD.withMPD MPD.status
+ghci> getStatusField st MPD.stVolume
+@
+Just (Just 100)
 -}
-getStatusItem :: Either MPD.MPDError MPD.Status -> (MPD.Status -> a) -> Maybe a
-getStatusItem (Right st) f = Just (f st)
-getStatusItem _ _ = Nothing
+getStatusField :: MPD.Response MPD.Status -> (MPD.Status -> a) -> Maybe a
+getStatusField (Right st) f = Just (f st)
+getStatusField _ _ = Nothing
+
+{- | Go a level deeper than `getStatusField'. For nested @Maybe a@
+fields from 'Network.MPD.Status'.
+
+==== __Example__:
+
+@
+ghci> import qualified Network.MPD as MPD
+ghci> st <- MPD.withMPD MPD.status
+ghci> getStatusFieldElement st MPD.stVolume
+@
+Just 100
+-}
+getStatusFieldElement :: MPD.Response MPD.Status -> (MPD.Status -> Maybe a) -> Maybe a
+getStatusFieldElement status item = fromMaybe Nothing $ getStatusField status item
 
 {- | @Either@ check for the returned value of 'Network.MPD.currentSong',
 then call 'processSong' or return @Nothing@.
@@ -136,4 +158,4 @@ getStatusIdInt item status =
     Just (MPD.Id int) -> Just int
     Nothing -> Nothing
   where
-    m = fromMaybe Nothing $ getStatusItem status item
+    m = fromMaybe Nothing $ getStatusField status item
