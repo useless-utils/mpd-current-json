@@ -30,7 +30,7 @@ import Data.Aeson.Encode.Pretty
 import qualified Data.ByteString.Lazy.Char8 as C
 import Text.Printf ( printf )
 import Options
-    ( optsParserInfo, execParser, Opts(optPass, optHost, optPort) )
+       ( optsParserInfo, execParser, Opts(..), NextSong(..) )
 
 import Network.MPD.Parse ( getStatusField
                          , getStatusFieldElement
@@ -260,6 +260,11 @@ terminal. =Data.Aeson='s encoding is returned as a =ByteString= so use the
 that supports =ByteString=​s.
 #+begin_src haskell
   C.putStrLn $ encodePretty' customEncodeConf jObject
+
+  case optNext opts of
+    OnlyNextSong -> putStrLn "ONLY NEXT (TEST)"
+    IncludeNextSong -> putStrLn "INCLUDE NEXT (TEST)"
+    NoNextSong -> putStrLn mempty
 #+end_src
 where ~customEncodeConf~ is an override for the
 ~Data.Aeson.Encode.Pretty~'s [[https://hackage.haskell.org/package/aeson-pretty-0.8.10/docs/Data-Aeson-Encode-Pretty.html#t:Config][Config]] data record. +This is really
@@ -303,6 +308,7 @@ customEncodeConf = defConfig
 #+begin_src haskell
 module Options
   ( Opts(..)
+  , NextSong(..)
   , execParser
   , prefs
   , showHelpOnEmpty
@@ -320,6 +326,7 @@ import Options.Applicative
       metavar,
       option,
       strOption,
+      flag',
       prefs,
       progDesc,
       short,
@@ -329,13 +336,14 @@ import Options.Applicative
       Parser,
       ParserInfo,
       infoOption,
-      hidden )
+      hidden,
+      many,
+      (<|>) )
 
 import Options.Applicative.Extra ( helperWith )
 
 import Version ( versionStr, progName )
 import Data.Kind (Type)
-
 #+end_src
 
 **** Data record for holding parsed 'Parser' values
@@ -347,8 +355,13 @@ data Opts = Opts  -- ^ Custom data record for storing 'Options.Applicative.Parse
   { optPort    :: Integer  -- ^ MPD port to connect.
   , optHost    :: String   -- ^ MPD host address to connect.
   , optPass    :: String   -- ^ Plain text password to connect to MPD.
+  , optNext    :: NextSong -- ^ Either include in the json or print it alone.
   , optVersion :: Type -> Type  -- ^ Print program version.
   }
+
+data NextSong = IncludeNextSong
+              | OnlyNextSong
+              | NoNextSong
 #+end_src
 
 **** ~Parser Opts~ definition
@@ -368,7 +381,11 @@ optsParser
   <$> portOptParser
   <*> hostOptParser
   <*> passOptParser
+  <*> nextSongOptParser
   <*> versionOptParse
+  where
+    nextSongOptParser = nextSongFlagCountOptParser
+                        <|> nextSongOnlyOptParser
 
 portOptParser :: Parser Integer
 portOptParser
@@ -396,6 +413,28 @@ passOptParser
   <> short 'P'
   <> value ""
   <> help "Password for connecting (will be sent as plain text)"
+
+nextSongFlagCountOptParser :: Parser NextSong
+nextSongFlagCountOptParser =
+  fmap (intToNextSong . length) <$> many
+  $ flag' ()
+  $ short 'n'
+  <> long "next"
+  <> help ( concat
+            [ "If used once (e.g. -n), include next song information in the output.\n"
+            , "if used twice (e.g. -nn) it's an alias for --next-only." ])
+
+nextSongOnlyOptParser :: Parser NextSong
+nextSongOnlyOptParser
+  = flag' OnlyNextSong
+    ( long "next-only"
+      <> help "Only print next song information." )
+
+intToNextSong :: Int -> NextSong
+intToNextSong count
+  | count == 1 = IncludeNextSong
+  | count > 1 = OnlyNextSong
+  | otherwise = NoNextSong
 
 versionOptParse :: Parser (a -> a)
 versionOptParse =
@@ -724,7 +763,7 @@ name:               mpd-current-json
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            1.5.0.0
+version:            2.0.0.0
 synopsis:           Print current MPD song and status as JSON
 
 -- A longer description of the package.
@@ -777,7 +816,7 @@ executable mpd-current-json
                     , aeson
                     , bytestring >=0.11 && <0.13
                     , aeson-pretty == 0.8.*
-                    , mpd-current-json == 1.5.*
+                    , mpd-current-json
 
     -- Directories containing source files.
     hs-source-dirs:   src

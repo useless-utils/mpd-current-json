@@ -11,7 +11,7 @@ import Data.Aeson.Encode.Pretty
 import qualified Data.ByteString.Lazy.Char8 as C
 import Text.Printf ( printf )
 import Options
-    ( optsParserInfo, execParser, Opts(optPass, optHost, optPort) )
+       ( optsParserInfo, execParser, Opts(..), NextSong(..) )
 
 import Network.MPD.Parse ( getStatusField
                          , getStatusFieldElement
@@ -183,6 +183,11 @@ main = do
                        ]
 
   C.putStrLn $ encodePretty' customEncodeConf jObject
+
+  case optNext opts of
+    OnlyNextSong -> putStrLn "ONLY NEXT (TEST)"
+    IncludeNextSong -> putStrLn "INCLUDE NEXT (TEST)"
+    NoNextSong -> putStrLn mempty
 
 customEncodeConf :: Config
 customEncodeConf = defConfig

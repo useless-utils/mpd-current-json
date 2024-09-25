@@ -7,7 +7,7 @@ name:               mpd-current-json
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            1.5.0.0
+version:            2.0.0.0
 synopsis:           Print current MPD song and status as JSON
 
 -- A longer description of the package.
@@ -60,7 +60,7 @@ executable mpd-current-json
                     , aeson
                     , bytestring >=0.11 && <0.13
                     , aeson-pretty == 0.8.*
-                    , mpd-current-json == 1.5.*
+                    , mpd-current-json
 
     -- Directories containing source files.
     hs-source-dirs:   src
