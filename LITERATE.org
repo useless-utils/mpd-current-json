@@ -158,7 +158,7 @@ values.
       nextId         = getStatusIdInt MPD.stNextSongID st
       playlistLength = getStatusField st MPD.stPlaylistLength
 
-  nextPlaylistSong <- withMpdOpts $ MPD.playlistInfo nextId
+  nextPlaylistSong <- withMpdOpts $ MPD.playlistInfo nextPos
   let filename = maybePathCurrentSong cs
       filenameNext = maybePathNextPlaylistSong nextPlaylistSong
 #+end_src
@@ -724,7 +724,7 @@ name:               mpd-current-json
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            1.5.0.0
+version:            1.5.0.1
 synopsis:           Print current MPD song and status as JSON
 
 -- A longer description of the package.
@@ -800,6 +800,12 @@ executable mpd-current-json
 
 * Changelog
 #+begin_src markdown :tangle CHANGELOG.md
+# v1.5.0.1
+- Fix `next_filename` to display correct filename URI.
+  - It was using Id instead of Position. Position is a 0-indexed
+    number, Id is 1-indexed and it was returning one song after the
+    intended one in the playlist. Oops.
+
 # v1.5
 - Add json keys
   - `volume`: Integer for volume percentage

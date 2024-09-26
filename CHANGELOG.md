@@ -1,3 +1,9 @@
+# v1.5.0.1
+- Fix `next_filename` to display correct filename URI.
+  - It was using Id instead of Position. Position is a 0-indexed
+    number, Id is 1-indexed and it was returning one song after the
+    intended one in the playlist. Oops.
+
 # v1.5
 - Add json keys
   - `volume`: Integer for volume percentage

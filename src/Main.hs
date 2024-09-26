@@ -111,7 +111,7 @@ main = do
       nextId         = getStatusIdInt MPD.stNextSongID st
       playlistLength = getStatusField st MPD.stPlaylistLength
 
-  nextPlaylistSong <- withMpdOpts $ MPD.playlistInfo nextId
+  nextPlaylistSong <- withMpdOpts $ MPD.playlistInfo nextPos
   let filename = maybePathCurrentSong cs
       filenameNext = maybePathNextPlaylistSong nextPlaylistSong
 
