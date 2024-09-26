@@ -2,6 +2,7 @@ module Network.MPD.Parse
   ( getStatusField
   , getStatusFieldElement
   , getTag
+  , getTagNextSong
   , processSong
   , maybePathCurrentSong
   , maybePathNextPlaylistSong
@@ -63,6 +64,13 @@ getTag t c =
   case c of
     Left _ -> Nothing
     Right song -> processSong t song
+
+getTagNextSong :: Metadata -> Either a [Song] -> Maybe String
+getTagNextSong tag song =
+  case song of
+    Right [s] -> MPD.sgGetTag tag s >>= headMay >>= valueToStringMay
+    Left _    -> Nothing
+    _         -> Nothing
 
 {- | Use 'Network.MPD.sgGetTag' to extract a @tag@ from a @song@, safely
 get only the head item of the returned @Maybe@ list, then safely

@@ -16,6 +16,7 @@ import Options
 import Network.MPD.Parse ( getStatusField
                          , getStatusFieldElement
                          , getTag
+                         , getTagNextSong
                          , maybePathCurrentSong
                          , maybePathNextPlaylistSong
                          , (.=?)
@@ -38,32 +39,7 @@ main = do
   cs <- withMpdOpts MPD.currentSong
   st <- withMpdOpts MPD.status
 
-  let artist                     = getTag Artist                     cs
-      artistSort                 = getTag ArtistSort                 cs
-      album                      = getTag Album                      cs
-      albumSort                  = getTag AlbumSort                  cs
-      albumArtist                = getTag AlbumArtist                cs
-      albumArtistSort            = getTag AlbumArtistSort            cs
-      title                      = getTag Title                      cs
-      track                      = getTag Track                      cs
-      name                       = getTag Name                       cs
-      genre                      = getTag Genre                      cs
-      date                       = getTag Date                       cs
-      originalDate               = getTag OriginalDate               cs
-      composer                   = getTag Composer                   cs
-      performer                  = getTag Performer                  cs
-      conductor                  = getTag Conductor                  cs
-      work                       = getTag Work                       cs
-      grouping                   = getTag Grouping                   cs
-      comment                    = getTag Comment                    cs
-      disc                       = getTag Disc                       cs
-      label                      = getTag Label                      cs
-      musicbrainz_ArtistId       = getTag MUSICBRAINZ_ARTISTID       cs
-      musicbrainz_AlbumId        = getTag MUSICBRAINZ_ALBUMID        cs
-      musicbrainz_AlbumartistId  = getTag MUSICBRAINZ_ALBUMARTISTID  cs
-      musicbrainz_TrackId        = getTag MUSICBRAINZ_TRACKID        cs
-      musicbrainz_ReleasetrackId = getTag MUSICBRAINZ_RELEASETRACKID cs
-      musicbrainz_WorkId         = getTag MUSICBRAINZ_WORKID         cs
+  -- #TODO update this
 
   let state :: Maybe String
       state = playbackStateToString <$> getStatusField st MPD.stState
@@ -115,33 +91,35 @@ main = do
       filenameNext = maybePathNextPlaylistSong nextPlaylistSong
 
   -- sgTags
-  let jTags = objectJson
-        [ "artist"                     .=? artist
-        , "artist_sort"                .=? artistSort
-        , "album"                      .=? album
-        , "album_sort"                 .=? albumSort
-        , "album_artist"               .=? albumArtist
-        , "album_artist_sort"          .=? albumArtistSort
-        , "title"                      .=? title
-        , "track"                      .=? track
-        , "name"                       .=? name
-        , "genre"                      .=? genre
-        , "date"                       .=? date
-        , "original_date"              .=? originalDate
-        , "composer"                   .=? composer
-        , "performer"                  .=? performer
-        , "conductor"                  .=? conductor
-        , "work"                       .=? work
-        , "grouping"                   .=? grouping
-        , "comment"                    .=? comment
-        , "disc"                       .=? disc
-        , "label"                      .=? label
-        , "musicbrainz_artistid"       .=? musicbrainz_ArtistId
-        , "musicbrainz_albumid"        .=? musicbrainz_AlbumId
-        , "musicbrainz_albumartistid"  .=? musicbrainz_AlbumartistId
-        , "musicbrainz_trackid"        .=? musicbrainz_TrackId
-        , "musicbrainz_releasetrackid" .=? musicbrainz_ReleasetrackId
-        , "musicbrainz_workid"         .=? musicbrainz_WorkId
+  let currentSongTags = getAllTags getTag cs
+
+  let jCurrentSongTagsObject = objectJson
+        [ "artist"                     .=? artist currentSongTags
+        , "artist_sort"                .=? artistSort currentSongTags
+        , "album"                      .=? album currentSongTags
+        , "album_sort"                 .=? albumSort currentSongTags
+        , "album_artist"               .=? albumArtist currentSongTags
+        , "album_artist_sort"          .=? albumArtistSort currentSongTags
+        , "title"                      .=? title currentSongTags
+        , "track"                      .=? track currentSongTags
+        , "name"                       .=? name currentSongTags
+        , "genre"                      .=? genre currentSongTags
+        , "date"                       .=? date currentSongTags
+        , "original_date"              .=? originalDate currentSongTags
+        , "composer"                   .=? composer currentSongTags
+        , "performer"                  .=? performer currentSongTags
+        , "conductor"                  .=? conductor currentSongTags
+        , "work"                       .=? work currentSongTags
+        , "grouping"                   .=? grouping currentSongTags
+        , "comment"                    .=? comment currentSongTags
+        , "disc"                       .=? disc currentSongTags
+        , "label"                      .=? label currentSongTags
+        , "musicbrainz_artistid"       .=? musicbrainz_ArtistId currentSongTags
+        , "musicbrainz_albumid"        .=? musicbrainz_AlbumId currentSongTags
+        , "musicbrainz_albumartistid"  .=? musicbrainz_AlbumartistId currentSongTags
+        , "musicbrainz_trackid"        .=? musicbrainz_TrackId currentSongTags
+        , "musicbrainz_releasetrackid" .=? musicbrainz_ReleasetrackId currentSongTags
+        , "musicbrainz_workid"         .=? musicbrainz_WorkId currentSongTags
         ]
 
   -- status
@@ -178,7 +156,7 @@ main = do
                        , "next_filename" .= filenameNext
                        , "playlist"      .= jPlaylist
                        , "status"        .= jStatus
-                       , "tags"          .= jTags
+                       , "tags"          .= jCurrentSongTagsObject
                        ]
 
   C.putStrLn $ encodePretty' customEncodeConf jObject
@@ -187,6 +165,41 @@ main = do
     OnlyNextSong -> putStrLn "ONLY NEXT (TEST)"
     IncludeNextSong -> putStrLn "INCLUDE NEXT (TEST)"
     NoNextSong -> putStrLn mempty
+
+  let nextSongTags = getAllTags getTagNextSong nextPlaylistSong
+
+  let jNextSongTagsObject = objectJson
+        [ "artist"                     .=? artist nextSongTags
+        , "artist_sort"                .=? artistSort nextSongTags
+        , "album"                      .=? album nextSongTags
+        , "album_sort"                 .=? albumSort nextSongTags
+        , "album_artist"               .=? albumArtist nextSongTags
+        , "album_artist_sort"          .=? albumArtistSort nextSongTags
+        , "title"                      .=? title nextSongTags
+        , "track"                      .=? track nextSongTags
+        , "name"                       .=? name nextSongTags
+        , "genre"                      .=? genre nextSongTags
+        , "date"                       .=? date nextSongTags
+        , "original_date"              .=? originalDate nextSongTags
+        , "composer"                   .=? composer nextSongTags
+        , "performer"                  .=? performer nextSongTags
+        , "conductor"                  .=? conductor nextSongTags
+        , "work"                       .=? work nextSongTags
+        , "grouping"                   .=? grouping nextSongTags
+        , "comment"                    .=? comment nextSongTags
+        , "disc"                       .=? disc nextSongTags
+        , "label"                      .=? label nextSongTags
+        , "musicbrainz_artistid"       .=? musicbrainz_ArtistId nextSongTags
+        , "musicbrainz_albumid"        .=? musicbrainz_AlbumId nextSongTags
+        , "musicbrainz_albumartistid"  .=? musicbrainz_AlbumartistId nextSongTags
+        , "musicbrainz_trackid"        .=? musicbrainz_TrackId nextSongTags
+        , "musicbrainz_releasetrackid" .=? musicbrainz_ReleasetrackId nextSongTags
+        , "musicbrainz_workid"         .=? musicbrainz_WorkId nextSongTags
+        ]
+
+  let jNextObject = object [ "next" .= object [ "tags" .= jNextSongTagsObject ] ]
+
+  C.putStrLn $ encodePretty' customEncodeConf jNextObject
 
 customEncodeConf :: Config
 customEncodeConf = defConfig
@@ -216,3 +229,103 @@ customEncodeConf = defConfig
                            , "length"
                            ]
   }
+
+
+
+
+data ExtractedTags = ExtractedTags
+  { artist                     :: Maybe String
+  , artistSort                 :: Maybe String
+  , album                      :: Maybe String
+  , albumSort                  :: Maybe String
+  , albumArtist                :: Maybe String
+  , albumArtistSort            :: Maybe String
+  , title                      :: Maybe String
+  , track                      :: Maybe String
+  , name                       :: Maybe String
+  , genre                      :: Maybe String
+  , date                       :: Maybe String
+  , originalDate               :: Maybe String
+  , composer                   :: Maybe String
+  , performer                  :: Maybe String
+  , conductor                  :: Maybe String
+  , work                       :: Maybe String
+  , grouping                   :: Maybe String
+  , comment                    :: Maybe String
+  , disc                       :: Maybe String
+  , label                      :: Maybe String
+  , musicbrainz_ArtistId       :: Maybe String
+  , musicbrainz_AlbumId        :: Maybe String
+  , musicbrainz_AlbumartistId  :: Maybe String
+  , musicbrainz_TrackId        :: Maybe String
+  , musicbrainz_ReleasetrackId :: Maybe String
+  , musicbrainz_WorkId         :: Maybe String
+  } deriving (Show, Eq)
+
+getAllTags :: (Metadata -> t -> Maybe String) -> t -> ExtractedTags
+getAllTags f s = ExtractedTags
+  { artist                     = f Artist                     s
+  , artistSort                 = f ArtistSort                 s
+  , album                      = f Album                      s
+  , albumSort                  = f AlbumSort                  s
+  , albumArtist                = f AlbumArtist                s
+  , albumArtistSort            = f AlbumArtistSort            s
+  , title                      = f Title                      s
+  , track                      = f Track                      s
+  , name                       = f Name                       s
+  , genre                      = f Genre                      s
+  , date                       = f Date                       s
+  , originalDate               = f OriginalDate               s
+  , composer                   = f Composer                   s
+  , performer                  = f Performer                  s
+  , conductor                  = f Conductor                  s
+  , work                       = f Work                       s
+  , grouping                   = f Grouping                   s
+  , comment                    = f Comment                    s
+  , disc                       = f Disc                       s
+  , label                      = f Label                      s
+  , musicbrainz_ArtistId       = f MUSICBRAINZ_ARTISTID       s
+  , musicbrainz_AlbumId        = f MUSICBRAINZ_ALBUMID        s
+  , musicbrainz_AlbumartistId  = f MUSICBRAINZ_ALBUMARTISTID  s
+  , musicbrainz_TrackId        = f MUSICBRAINZ_TRACKID        s
+  , musicbrainz_ReleasetrackId = f MUSICBRAINZ_RELEASETRACKID s
+  , musicbrainz_WorkId         = f MUSICBRAINZ_WORKID         s
+  }
+
+
+-- example output of
+-- ghci> withMpdOpts MPD.status >>= \x -> withMpdOpts $ MPD.playlistInfo $ getStatusIdInt MPD.stNextSongID x
+--
+-- Right
+--   [ Song
+--       { sgFilePath = Path "I/Ina Forsman/[2022] All There Is [16bit 44.1kHz FLAC]/06. One Night In Berlin.flac"
+--       , sgTags = fromList
+--           [ (Artist, [Value "Ina Forsman"])
+--           , (ArtistSort, [Value "Forsman, Ina"])
+--           , (Album, [Value "All There Is"])
+--           , (AlbumArtist, [Value "Ina Forsman"])
+--           , (AlbumArtistSort, [Value "Forsman, Ina"])
+--           , (Title, [Value "One Night In Berlin"])
+--           , (Track, [Value "6"])
+--           , (Genre, [Value "R&B, Soul, Funk"])
+--           , (Date, [Value "2022-06-25"])
+--           , (OriginalDate, [Value "2022-06-25"])
+--           , (Composer, [Value "Ina Forsman"])
+--           , (Comment,
+--               [ Value
+--                   "{'Classical Extras': ...} (artists_options)"
+--               ])
+--           , (Disc, [Value "1"])
+--           , (Label, [Value "Jazzhaus Records"])
+--           , (MUSICBRAINZ_ARTISTID, [Value "f19fb535-3c91-4be8-8c14-ed06fa079f57"])
+--           , (MUSICBRAINZ_ALBUMID, [Value "80083158-e00f-4fa5-913f-6ac452170870"])
+--           , (MUSICBRAINZ_ALBUMARTISTID, [Value "f19fb535-3c91-4be8-8c14-ed06fa079f57"])
+--           , (MUSICBRAINZ_TRACKID, [Value "86e28f16-047b-4e87-abc3-b7a34ff8f2fd"])
+--           , (MUSICBRAINZ_RELEASETRACKID, [Value "94bf46b1-d216-403d-9e07-00084f83f85a"])
+--           ]
+--       , sgLastModified = Just 2024-03-21 08:24:25 UTC
+--       , sgLength = 220
+--       , sgId = Just (Id 284)
+--       , sgIndex = Just 283
+--       }
+--   ]
