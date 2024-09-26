@@ -42,6 +42,7 @@ import Network.MPD.Parse ( getStatusField
                          , getStatusIdInt )
 
 import Text.Read (readMaybe)
+import Data.Maybe (fromMaybe)
 #+end_src
 
 **** Main
@@ -112,21 +113,22 @@ Likewise, =getStatusItem= parses values from =Status {...}= returned by
 values.
 #+begin_src haskell
   let state :: Maybe String
-      state = case getStatusField st MPD.stState of
-                Just ps -> case ps of
-                             Playing -> Just "playing"
-                             Paused  -> Just "paused"
-                             Stopped -> Just "stopped"
-                Nothing -> Nothing
+      state = playbackStateToString <$> getStatusField st MPD.stState
+        where
+          playbackStateToString Playing = "playing"
+          playbackStateToString Paused  = "paused"
+          playbackStateToString Stopped = "stopped"
 
       time = getStatusFieldElement st MPD.stTime
       elapsed = fst <$> time
       duration = snd <$> time
 
       elapsedPercent :: Maybe Double
-      elapsedPercent = case time of
-        Just t1 -> readMaybe $ printf "%.2f" (uncurry (/) t1 * 100)
-        Nothing -> Just 0.0
+      elapsedPercent = readMaybe percentTwoDecimals
+        where
+          percentTwoDecimals = printf "%.2f" timeToPercent
+          timeToPercent = uncurry (/) t * 100
+          t = fromMaybe (0,0) time
 
       volumeSt :: Maybe Int
       volumeSt = fromIntegral <$> getStatusFieldElement st MPD.stVolume
@@ -139,11 +141,8 @@ values.
       audioFormat    = getStatusField st MPD.stAudio
       errorSt        = getStatusField st MPD.stError
 
-      updatingDbSt   = isJust updatingDbMaybe
-        where
-          updatingDbMaybe = getStatusFieldElement st MPD.stUpdatingDb -- "Nothing" or "Just 1"
-          isJust Nothing = Nothing
-          isJust _       = Just True
+      updatingDbSt :: Maybe Bool
+      updatingDbSt   = (== 1) <$> getStatusFieldElement st MPD.stUpdatingDb
 
       crossfadeSt :: Maybe Int
       crossfadeSt = fromIntegral <$> getStatusField st MPD.stXFadeWidth
