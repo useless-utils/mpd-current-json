@@ -605,6 +605,17 @@ getStatusFieldElement :: MPD.Response MPD.Status -> (MPD.Status -> Maybe a) -> M
 getStatusFieldElement status item = fromMaybe Nothing $ getStatusField status item
 #+end_src
 
+Instead of parsing using function argument definitions, define a data
+type that instances the specific response the parsing functions
+return.
+#+begin_src haskell
+type CurrentSong = MPD.Response (Maybe Song)
+type NextSong = MPD.Response [Song]
+
+data SongCurrentOrNext = Current !CurrentSong
+                       | Next !NextSong
+#+end_src
+
 
 The =getTag= function takes a metadata type =t= and an =Either= value
 =c= containing a =Maybe Song=. It checks if the =Either= value is
@@ -614,9 +625,6 @@ metadata type =t= and the =Just song= value, which extracts the tag
 value from the song. The =getTag= function helps to retrieve a
 specific tag value from the song if it exists.
 #+begin_src haskell
-data SongCurrentOrNext = Current !(MPD.Response (Maybe Song))
-                       | Next !(MPD.Response [Song])
-
 getTag :: Metadata -> SongCurrentOrNext -> TagField
 getTag tag (Current song) =
   case song of

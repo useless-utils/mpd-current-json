@@ -53,8 +53,11 @@ Just 100
 getStatusFieldElement :: MPD.Response MPD.Status -> (MPD.Status -> Maybe a) -> Maybe a
 getStatusFieldElement status item = fromMaybe Nothing $ getStatusField status item
 
-data SongCurrentOrNext = Current !(MPD.Response (Maybe Song))
-                       | Next !(MPD.Response [Song])
+type CurrentSong = MPD.Response (Maybe Song)
+type NextSong = MPD.Response [Song]
+
+data SongCurrentOrNext = Current !CurrentSong
+                       | Next !NextSong
 
 getTag :: Metadata -> SongCurrentOrNext -> TagField
 getTag tag (Current song) =
