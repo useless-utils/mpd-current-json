@@ -5,7 +5,7 @@ module Network.MPD.Parse
        -- , maybePathCurrentSong
        -- , maybePathNextPlaylistSong
        -- , (.=?)
-       -- , objectJson
+       -- , objectMaybes
        -- , getStatusIdInt
        -- , tagFieldToMaybeString )
 where
@@ -155,13 +155,13 @@ not be included in 'Data.Aeson.object' because of
 (.=?) :: (KeyValue e a, ToJSON v) => Key -> Maybe v -> Maybe a
 key .=? Just value = Just (key .= value)
 _   .=? Nothing    = Nothing
-infixr 6 .=?
+infixr 8 .=?
 
 -- | Helper function for creating an JSON 'Data.Aeson.object' where
 -- 'Data.Maybe.catMaybes' won't include items from the '[Maybe Pair]'
 -- list that return 'Nothing'.
-objectJson :: [Maybe Pair] -> Value
-objectJson = object . catMaybes
+objectMaybes :: [Maybe Pair] -> Value
+objectMaybes = object . catMaybes
 
 -- | Extracts the 'Int' value from an 'MPD.Id' within 'MPD.Status', if
 -- present and the 'Either' value is a 'Right'.

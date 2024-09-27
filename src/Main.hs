@@ -85,7 +85,7 @@ main = do
   -- sgTags
   let currentSongTags = getAllTags $ Current cs
 
-  let jCurrentSongTagsObject = objectJson
+  let jCurrentSongTags = objectMaybes
         [ "artist"                     .=? tagFieldToMaybeString (artist                     currentSongTags)
         , "artist_sort"                .=? tagFieldToMaybeString (artistSort                 currentSongTags)
         , "album"                      .=? tagFieldToMaybeString (album                      currentSongTags)
@@ -115,7 +115,7 @@ main = do
         ]
 
   -- status
-  let jStatus = objectJson
+  let jStatus = objectMaybes
         [ "state"           .=? state
         , "repeat"          .=? repeatSt
         , "random"          .=? randomSt
@@ -134,9 +134,9 @@ main = do
         , "error"           .=? errorSt
         ]
 
-  -- let jFilename = objectJson [ "file" .=? filename ]
+  -- let jFilename = objectMaybes [ "file" .=? filename ]
 
-  let jPlaylist = objectJson
+  let jPlaylist = objectMaybes
         [ "position"      .=? pos  -- current song position
         , "next_position" .=? nextPos
         , "id"            .=? songId  -- current song id
@@ -144,16 +144,9 @@ main = do
         , "length"        .=? playlistLength
         ]
 
-  let jObject = object [ "filename"      .= filename
-                       , "next_filename" .= filenameNext
-                       , "playlist"      .= jPlaylist
-                       , "status"        .= jStatus
-                       , "tags"          .= jCurrentSongTagsObject
-                       ]
-
   let nextSongTags = getAllTags $ Next nextPlaylistSong
 
-  let jNextSongTagsObject = objectJson
+  let jNextSongTags = objectMaybes
         [ "artist"                     .=? tagFieldToMaybeString (artist                     nextSongTags)
         , "artist_sort"                .=? tagFieldToMaybeString (artistSort                 nextSongTags)
         , "album"                      .=? tagFieldToMaybeString (album                      nextSongTags)
@@ -182,21 +175,40 @@ main = do
         , "musicbrainz_workid"         .=? tagFieldToMaybeString (musicbrainz_WorkId         nextSongTags)
         ]
 
-  let jNextObject = object [ "next" .= object [ "tags" .= jNextSongTagsObject ] ]
+  let jObject = object [ "filename"      .= filename
+                       , "next_filename" .= filenameNext
+                       , "playlist"      .= jPlaylist
+                       , "status"        .= jStatus
+                       , "tags"          .= jCurrentSongTags
+                       ]
+  let jObjectBoth = object [ "filename"      .= filename
+                           , "next_filename" .= filenameNext
+                           , "playlist"      .= jPlaylist
+                           , "status"        .= jStatus
+                           , "tags"          .= jCurrentSongTags
+                           , "next"          .= object [ "tags" .= jNextSongTags ]
+                           ]
+  let jObjectNextOnly = object [ "filename"      .= filename
+                               , "next_filename" .= filenameNext
+                               , "playlist"      .= jPlaylist
+                               , "status"        .= jStatus
+                               , "tags"          .= jNextSongTags
+                               ]
+
+  let printJson j = C.putStrLn $ encodePretty' customEncodeConf j
 
   case optNext opts of
     NoNextSong -> printJson jObject
-    OnlyNextSong -> printJson jNextObject
-    IncludeNextSong -> do printJson jObject
-                          printJson jNextObject
+    OnlyNextSong -> printJson jObjectNextOnly
+    IncludeNextSong -> do printJson jObjectBoth
     where
-      printJson j = C.putStrLn $ encodePretty' customEncodeConf j
 
 customEncodeConf :: Config
 customEncodeConf = defConfig
  { confCompare =
    keyOrder
- [ "title", "name"
+ [ "filename", "next_filename", "status", "playlist", "tags", "next"
+ , "title", "name"
  , "artist", "album_artist", "artist_sort", "album_artist_sort"
  , "album", "album_sort"
  , "track", "disc"
@@ -218,7 +230,7 @@ customEncodeConf = defConfig
  , "updating_db"
  , "error"
  -- playlist
- , "position", "next_position", "id", "next_id"
+ , "id", "next_id", "position", "next_position"
  , "length"
  ]
  }

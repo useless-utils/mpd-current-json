@@ -150,7 +150,7 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
   -- sgTags
   let currentSongTags = getAllTags $ Current cs
 
-  let jCurrentSongTagsObject = objectJson
+  let jCurrentSongTags = objectMaybes
         [ "artist"                     .=? tagFieldToMaybeString (artist                     currentSongTags)
         , "artist_sort"                .=? tagFieldToMaybeString (artistSort                 currentSongTags)
         , "album"                      .=? tagFieldToMaybeString (album                      currentSongTags)
@@ -180,7 +180,7 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
         ]
 
   -- status
-  let jStatus = objectJson
+  let jStatus = objectMaybes
         [ "state"           .=? state
         , "repeat"          .=? repeatSt
         , "random"          .=? randomSt
@@ -199,38 +199,19 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
         , "error"           .=? errorSt
         ]
 
-  -- let jFilename = objectJson [ "file" .=? filename ]
+  -- let jFilename = objectMaybes [ "file" .=? filename ]
 
-  let jPlaylist = objectJson
+  let jPlaylist = objectMaybes
         [ "position"      .=? pos  -- current song position
         , "next_position" .=? nextPos
         , "id"            .=? songId  -- current song id
         , "next_id"       .=? nextId
         , "length"        .=? playlistLength
         ]
-#+end_src
 
-Having two objects, one for "tags" and other for "status", create a
-nested JSON with labels before each of them.
-#+begin_src haskell
-  let jObject = object [ "filename"      .= filename
-                       , "next_filename" .= filenameNext
-                       , "playlist"      .= jPlaylist
-                       , "status"        .= jStatus
-                       , "tags"          .= jCurrentSongTagsObject
-                       ]
-#+end_src
-e.g. so they can be parsed as "=.tags.title=" or
-"=.status.elapsed_percent=".
-
-Finally, encode it to real JSON and print it to the
-terminal. =Data.Aeson='s encoding is returned as a =ByteString= so use the
-=Data.ByteString...= import that provides an implementation of =putStrLn=
-that supports =ByteString=​s.
-#+begin_src haskell
   let nextSongTags = getAllTags $ Next nextPlaylistSong
 
-  let jNextSongTagsObject = objectJson
+  let jNextSongTags = objectMaybes
         [ "artist"                     .=? tagFieldToMaybeString (artist                     nextSongTags)
         , "artist_sort"                .=? tagFieldToMaybeString (artistSort                 nextSongTags)
         , "album"                      .=? tagFieldToMaybeString (album                      nextSongTags)
@@ -258,16 +239,46 @@ that supports =ByteString=​s.
         , "musicbrainz_releasetrackid" .=? tagFieldToMaybeString (musicbrainz_ReleasetrackId nextSongTags)
         , "musicbrainz_workid"         .=? tagFieldToMaybeString (musicbrainz_WorkId         nextSongTags)
         ]
+#+end_src
 
-  let jNextObject = object [ "next" .= object [ "tags" .= jNextSongTagsObject ] ]
+Having two objects, one for "tags" and other for "status", create a
+nested JSON with labels before each of them.
+#+begin_src haskell
+  let jObject = object [ "filename"      .= filename
+                       , "next_filename" .= filenameNext
+                       , "playlist"      .= jPlaylist
+                       , "status"        .= jStatus
+                       , "tags"          .= jCurrentSongTags
+                       ]
+  let jObjectBoth = object [ "filename"      .= filename
+                           , "next_filename" .= filenameNext
+                           , "playlist"      .= jPlaylist
+                           , "status"        .= jStatus
+                           , "tags"          .= jCurrentSongTags
+                           , "next"          .= object [ "tags" .= jNextSongTags ]
+                           ]
+  let jObjectNextOnly = object [ "filename"      .= filename
+                               , "next_filename" .= filenameNext
+                               , "playlist"      .= jPlaylist
+                               , "status"        .= jStatus
+                               , "tags"          .= jNextSongTags
+                               ]
+#+end_src
+e.g. so they can be parsed as "=.tags.title=" or
+"=.status.elapsed_percent=".
+
+Finally, encode it to real JSON and print it to the
+terminal. =Data.Aeson='s encoding is returned as a =ByteString= so use the
+=Data.ByteString...= import that provides an implementation of =putStrLn=
+that supports =ByteString=​s.
+#+begin_src haskell
+  let printJson j = C.putStrLn $ encodePretty' customEncodeConf j
 
   case optNext opts of
     NoNextSong -> printJson jObject
-    OnlyNextSong -> printJson jNextObject
-    IncludeNextSong -> do printJson jObject
-                          printJson jNextObject
+    OnlyNextSong -> printJson jObjectNextOnly
+    IncludeNextSong -> do printJson jObjectBoth
     where
-      printJson j = C.putStrLn $ encodePretty' customEncodeConf j
 #+end_src
 where ~customEncodeConf~ is an override for the
 ~Data.Aeson.Encode.Pretty~'s [[https://hackage.haskell.org/package/aeson-pretty-0.8.10/docs/Data-Aeson-Encode-Pretty.html#t:Config][Config]] data record. +This is really
@@ -278,7 +289,8 @@ customEncodeConf :: Config
 customEncodeConf = defConfig
  { confCompare =
    keyOrder
- [ "title", "name"
+ [ "filename", "next_filename", "status", "playlist", "tags", "next"
+ , "title", "name"
  , "artist", "album_artist", "artist_sort", "album_artist_sort"
  , "album", "album_sort"
  , "track", "disc"
@@ -300,7 +312,7 @@ customEncodeConf = defConfig
  , "updating_db"
  , "error"
  -- playlist
- , "position", "next_position", "id", "next_id"
+ , "id", "next_id", "position", "next_position"
  , "length"
  ]
  }
@@ -539,7 +551,7 @@ module Network.MPD.Parse
        -- , maybePathCurrentSong
        -- , maybePathNextPlaylistSong
        -- , (.=?)
-       -- , objectJson
+       -- , objectMaybes
        -- , getStatusIdInt
        -- , tagFieldToMaybeString )
 where
@@ -738,7 +750,7 @@ not be included in 'Data.Aeson.object' because of
 (.=?) :: (KeyValue e a, ToJSON v) => Key -> Maybe v -> Maybe a
 key .=? Just value = Just (key .= value)
 _   .=? Nothing    = Nothing
-infixr 6 .=?
+infixr 8 .=?
 #+end_src
 
 Encoder helper for filtering list of ~[Maybe Pair]~ key/values.
@@ -746,8 +758,8 @@ Encoder helper for filtering list of ~[Maybe Pair]~ key/values.
 -- | Helper function for creating an JSON 'Data.Aeson.object' where
 -- 'Data.Maybe.catMaybes' won't include items from the '[Maybe Pair]'
 -- list that return 'Nothing'.
-objectJson :: [Maybe Pair] -> Value
-objectJson = object . catMaybes
+objectMaybes :: [Maybe Pair] -> Value
+objectMaybes = object . catMaybes
 #+end_src
 
 Get the ~Int~ from ~MPD.status~'s ~Either (Status {...})~ fields that use
