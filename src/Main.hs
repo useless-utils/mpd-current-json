@@ -160,13 +160,6 @@ main = do
                        , "tags"          .= jCurrentSongTagsObject
                        ]
 
-  C.putStrLn $ encodePretty' customEncodeConf jObject
-
-  case optNext opts of
-    OnlyNextSong -> putStrLn "ONLY NEXT (TEST)"
-    IncludeNextSong -> putStrLn "INCLUDE NEXT (TEST)"
-    NoNextSong -> putStrLn mempty
-
   let nextSongTags = getAllTags $ Next nextPlaylistSong
 
   let jNextSongTagsObject = objectJson
@@ -200,7 +193,13 @@ main = do
 
   let jNextObject = object [ "next" .= object [ "tags" .= jNextSongTagsObject ] ]
 
-  C.putStrLn $ encodePretty' customEncodeConf jNextObject
+  case optNext opts of
+    NoNextSong -> printJson jObject
+    OnlyNextSong -> printJson jNextObject
+    IncludeNextSong -> do printJson jObject
+                          printJson jNextObject
+    where
+      printJson j = C.putStrLn $ encodePretty' customEncodeConf j
 
 customEncodeConf :: Config
 customEncodeConf = defConfig

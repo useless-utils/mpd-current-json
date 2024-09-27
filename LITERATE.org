@@ -237,13 +237,6 @@ terminal. =Data.Aeson='s encoding is returned as a =ByteString= so use the
 =Data.ByteString...= import that provides an implementation of =putStrLn=
 that supports =ByteString=​s.
 #+begin_src haskell
-  C.putStrLn $ encodePretty' customEncodeConf jObject
-
-  case optNext opts of
-    OnlyNextSong -> putStrLn "ONLY NEXT (TEST)"
-    IncludeNextSong -> putStrLn "INCLUDE NEXT (TEST)"
-    NoNextSong -> putStrLn mempty
-
   let nextSongTags = getAllTags $ Next nextPlaylistSong
 
   let jNextSongTagsObject = objectJson
@@ -277,7 +270,13 @@ that supports =ByteString=​s.
 
   let jNextObject = object [ "next" .= object [ "tags" .= jNextSongTagsObject ] ]
 
-  C.putStrLn $ encodePretty' customEncodeConf jNextObject
+  case optNext opts of
+    NoNextSong -> printJson jObject
+    OnlyNextSong -> printJson jNextObject
+    IncludeNextSong -> do printJson jObject
+                          printJson jNextObject
+    where
+      printJson j = C.putStrLn $ encodePretty' customEncodeConf j
 #+end_src
 where ~customEncodeConf~ is an override for the
 ~Data.Aeson.Encode.Pretty~'s [[https://hackage.haskell.org/package/aeson-pretty-0.8.10/docs/Data-Aeson-Encode-Pretty.html#t:Config][Config]] data record. +This is really
@@ -315,43 +314,6 @@ customEncodeConf = defConfig
  ]
  }
 #+end_src
-
-# example output of
-# ghci> withMpdOpts MPD.status >>= \x -> withMpdOpts $ MPD.playlistInfo $ getStatusIdInt MPD.stNextSongID x
-#
-# Right
-#   [ Song
-#       { sgFilePath = Path "I/Ina Forsman/[2022] All There Is [16bit 44.1kHz FLAC]/06. One Night In Berlin.flac"
-#       , sgTags = fromList
-#           [ (Artist, [Value "Ina Forsman"])
-#           , (ArtistSort, [Value "Forsman, Ina"])
-#           , (Album, [Value "All There Is"])
-#           , (AlbumArtist, [Value "Ina Forsman"])
-#           , (AlbumArtistSort, [Value "Forsman, Ina"])
-#           , (Title, [Value "One Night In Berlin"])
-#           , (Track, [Value "6"])
-#           , (Genre, [Value "R&B, Soul, Funk"])
-#           , (Date, [Value "2022-06-25"])
-#           , (OriginalDate, [Value "2022-06-25"])
-#           , (Composer, [Value "Ina Forsman"])
-#           , (Comment,
-#               [ Value
-#                   "{'Classical Extras': ...} (artists_options)"
-#               ])
-#           , (Disc, [Value "1"])
-#           , (Label, [Value "Jazzhaus Records"])
-#           , (MUSICBRAINZ_ARTISTID, [Value "f19fb535-3c91-4be8-8c14-ed06fa079f57"])
-#           , (MUSICBRAINZ_ALBUMID, [Value "80083158-e00f-4fa5-913f-6ac452170870"])
-#           , (MUSICBRAINZ_ALBUMARTISTID, [Value "f19fb535-3c91-4be8-8c14-ed06fa079f57"])
-#           , (MUSICBRAINZ_TRACKID, [Value "86e28f16-047b-4e87-abc3-b7a34ff8f2fd"])
-#           , (MUSICBRAINZ_RELEASETRACKID, [Value "94bf46b1-d216-403d-9e07-00084f83f85a"])
-#           ]
-#       , sgLastModified = Just 2024-03-21 08:24:25 UTC
-#       , sgLength = 220
-#       , sgId = Just (Id 284)
-#       , sgIndex = Just 283
-#       }
-#   ]
 
 *** Options.hs
 :PROPERTIES:
