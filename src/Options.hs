@@ -1,6 +1,6 @@
 module Options
   ( Opts(..)
-  , NextSong(..)
+  , NextSongFlag(..)
   , execParser
   , prefs
   , showHelpOnEmpty
@@ -41,11 +41,11 @@ data Opts = Opts  -- ^ Custom data record for storing 'Options.Applicative.Parse
   { optPort    :: Integer  -- ^ MPD port to connect.
   , optHost    :: String   -- ^ MPD host address to connect.
   , optPass    :: String   -- ^ Plain text password to connect to MPD.
-  , optNext    :: NextSong -- ^ Either include in the json or print it alone.
+  , optNext    :: NextSongFlag -- ^ Either include in the json or print it alone.
   , optVersion :: Type -> Type  -- ^ Print program version.
   }
 
-data NextSong = IncludeNextSong
+data NextSongFlag = IncludeNextSong
               | OnlyNextSong
               | NoNextSong
 
@@ -88,7 +88,7 @@ passOptParser
   <> value ""
   <> help "Password for connecting (will be sent as plain text)"
 
-nextSongFlagCountOptParser :: Parser NextSong
+nextSongFlagCountOptParser :: Parser NextSongFlag
 nextSongFlagCountOptParser =
   fmap (intToNextSong . length) <$> many
   $ flag' ()
@@ -98,13 +98,13 @@ nextSongFlagCountOptParser =
             [ "If used once (e.g. -n), include next song information in the output.\n"
             , "if used twice (e.g. -nn) it's an alias for --next-only." ])
 
-nextSongOnlyOptParser :: Parser NextSong
+nextSongOnlyOptParser :: Parser NextSongFlag
 nextSongOnlyOptParser
   = flag' OnlyNextSong
     ( long "next-only"
       <> help "Only print next song information." )
 
-intToNextSong :: Int -> NextSong
+intToNextSong :: Int -> NextSongFlag
 intToNextSong count
   | count == 1 = IncludeNextSong
   | count > 1 = OnlyNextSong

@@ -4,24 +4,25 @@ module Main ( main ) where
 
 import qualified Network.MPD as MPD
 import Network.MPD
-       ( Metadata(..), PlaybackState(Stopped, Playing, Paused) )
+       ( PlaybackState(Stopped, Playing, Paused) )
 import Data.Aeson ( object, KeyValue((.=)) )
 import Data.Aeson.Encode.Pretty
        ( defConfig, encodePretty', keyOrder, Config(confCompare) )
 import qualified Data.ByteString.Lazy.Char8 as C
 import Text.Printf ( printf )
 import Options
-       ( optsParserInfo, execParser, Opts(..), NextSong(..) )
+       ( optsParserInfo, execParser, Opts(..), NextSongFlag(..) )
 
-import Network.MPD.Parse ( getStatusField
-                         , getStatusFieldElement
-                         , getTag
-                         , getTagNextSong
-                         , maybePathCurrentSong
-                         , maybePathNextPlaylistSong
-                         , (.=?)
-                         , objectJson
-                         , getStatusIdInt )
+import Network.MPD.Parse
+       -- ( getStatusField
+       -- , getStatusFieldElement
+       -- , getAllTags
+       -- , maybePathCurrentSong
+       -- , maybePathNextPlaylistSong
+       -- , (.=?)
+       -- , objectJson
+       -- , getStatusIdInt
+       -- , tagFieldToMaybeString )
 
 import Text.Read (readMaybe)
 import Data.Maybe (fromMaybe)
@@ -91,35 +92,35 @@ main = do
       filenameNext = maybePathNextPlaylistSong nextPlaylistSong
 
   -- sgTags
-  let currentSongTags = getAllTags getTag cs
+  let currentSongTags = getAllTags $ Current cs
 
   let jCurrentSongTagsObject = objectJson
-        [ "artist"                     .=? artist currentSongTags
-        , "artist_sort"                .=? artistSort currentSongTags
-        , "album"                      .=? album currentSongTags
-        , "album_sort"                 .=? albumSort currentSongTags
-        , "album_artist"               .=? albumArtist currentSongTags
-        , "album_artist_sort"          .=? albumArtistSort currentSongTags
-        , "title"                      .=? title currentSongTags
-        , "track"                      .=? track currentSongTags
-        , "name"                       .=? name currentSongTags
-        , "genre"                      .=? genre currentSongTags
-        , "date"                       .=? date currentSongTags
-        , "original_date"              .=? originalDate currentSongTags
-        , "composer"                   .=? composer currentSongTags
-        , "performer"                  .=? performer currentSongTags
-        , "conductor"                  .=? conductor currentSongTags
-        , "work"                       .=? work currentSongTags
-        , "grouping"                   .=? grouping currentSongTags
-        , "comment"                    .=? comment currentSongTags
-        , "disc"                       .=? disc currentSongTags
-        , "label"                      .=? label currentSongTags
-        , "musicbrainz_artistid"       .=? musicbrainz_ArtistId currentSongTags
-        , "musicbrainz_albumid"        .=? musicbrainz_AlbumId currentSongTags
-        , "musicbrainz_albumartistid"  .=? musicbrainz_AlbumartistId currentSongTags
-        , "musicbrainz_trackid"        .=? musicbrainz_TrackId currentSongTags
-        , "musicbrainz_releasetrackid" .=? musicbrainz_ReleasetrackId currentSongTags
-        , "musicbrainz_workid"         .=? musicbrainz_WorkId currentSongTags
+        [ "artist"                     .=? tagFieldToMaybeString (artist currentSongTags)
+        , "artist_sort"                .=? tagFieldToMaybeString (artistSort currentSongTags)
+        , "album"                      .=? tagFieldToMaybeString (album currentSongTags)
+        , "album_sort"                 .=? tagFieldToMaybeString (albumSort currentSongTags)
+        , "album_artist"               .=? tagFieldToMaybeString (albumArtist currentSongTags)
+        , "album_artist_sort"          .=? tagFieldToMaybeString (albumArtistSort currentSongTags)
+        , "title"                      .=? tagFieldToMaybeString (title currentSongTags)
+        , "track"                      .=? tagFieldToMaybeString (track currentSongTags)
+        , "name"                       .=? tagFieldToMaybeString (name currentSongTags)
+        , "genre"                      .=? tagFieldToMaybeString (genre currentSongTags)
+        , "date"                       .=? tagFieldToMaybeString (date currentSongTags)
+        , "original_date"              .=? tagFieldToMaybeString (originalDate currentSongTags)
+        , "composer"                   .=? tagFieldToMaybeString (composer currentSongTags)
+        , "performer"                  .=? tagFieldToMaybeString (performer currentSongTags)
+        , "conductor"                  .=? tagFieldToMaybeString (conductor currentSongTags)
+        , "work"                       .=? tagFieldToMaybeString (work currentSongTags)
+        , "grouping"                   .=? tagFieldToMaybeString (grouping currentSongTags)
+        , "comment"                    .=? tagFieldToMaybeString (comment currentSongTags)
+        , "disc"                       .=? tagFieldToMaybeString (disc currentSongTags)
+        , "label"                      .=? tagFieldToMaybeString (label currentSongTags)
+        , "musicbrainz_artistid"       .=? tagFieldToMaybeString (musicbrainz_ArtistId currentSongTags)
+        , "musicbrainz_albumid"        .=? tagFieldToMaybeString (musicbrainz_AlbumId currentSongTags)
+        , "musicbrainz_albumartistid"  .=? tagFieldToMaybeString (musicbrainz_AlbumartistId currentSongTags)
+        , "musicbrainz_trackid"        .=? tagFieldToMaybeString (musicbrainz_TrackId currentSongTags)
+        , "musicbrainz_releasetrackid" .=? tagFieldToMaybeString (musicbrainz_ReleasetrackId currentSongTags)
+        , "musicbrainz_workid"         .=? tagFieldToMaybeString (musicbrainz_WorkId currentSongTags)
         ]
 
   -- status
@@ -166,35 +167,35 @@ main = do
     IncludeNextSong -> putStrLn "INCLUDE NEXT (TEST)"
     NoNextSong -> putStrLn mempty
 
-  let nextSongTags = getAllTags getTagNextSong nextPlaylistSong
+  let nextSongTags = getAllTags $ Next nextPlaylistSong
 
   let jNextSongTagsObject = objectJson
-        [ "artist"                     .=? artist nextSongTags
-        , "artist_sort"                .=? artistSort nextSongTags
-        , "album"                      .=? album nextSongTags
-        , "album_sort"                 .=? albumSort nextSongTags
-        , "album_artist"               .=? albumArtist nextSongTags
-        , "album_artist_sort"          .=? albumArtistSort nextSongTags
-        , "title"                      .=? title nextSongTags
-        , "track"                      .=? track nextSongTags
-        , "name"                       .=? name nextSongTags
-        , "genre"                      .=? genre nextSongTags
-        , "date"                       .=? date nextSongTags
-        , "original_date"              .=? originalDate nextSongTags
-        , "composer"                   .=? composer nextSongTags
-        , "performer"                  .=? performer nextSongTags
-        , "conductor"                  .=? conductor nextSongTags
-        , "work"                       .=? work nextSongTags
-        , "grouping"                   .=? grouping nextSongTags
-        , "comment"                    .=? comment nextSongTags
-        , "disc"                       .=? disc nextSongTags
-        , "label"                      .=? label nextSongTags
-        , "musicbrainz_artistid"       .=? musicbrainz_ArtistId nextSongTags
-        , "musicbrainz_albumid"        .=? musicbrainz_AlbumId nextSongTags
-        , "musicbrainz_albumartistid"  .=? musicbrainz_AlbumartistId nextSongTags
-        , "musicbrainz_trackid"        .=? musicbrainz_TrackId nextSongTags
-        , "musicbrainz_releasetrackid" .=? musicbrainz_ReleasetrackId nextSongTags
-        , "musicbrainz_workid"         .=? musicbrainz_WorkId nextSongTags
+        [ "artist"                     .=? tagFieldToMaybeString (artist nextSongTags)
+        , "artist_sort"                .=? tagFieldToMaybeString (artistSort nextSongTags)
+        , "album"                      .=? tagFieldToMaybeString (album nextSongTags)
+        , "album_sort"                 .=? tagFieldToMaybeString (albumSort nextSongTags)
+        , "album_artist"               .=? tagFieldToMaybeString (albumArtist nextSongTags)
+        , "album_artist_sort"          .=? tagFieldToMaybeString (albumArtistSort nextSongTags)
+        , "title"                      .=? tagFieldToMaybeString (title nextSongTags)
+        , "track"                      .=? tagFieldToMaybeString (track nextSongTags)
+        , "name"                       .=? tagFieldToMaybeString (name nextSongTags)
+        , "genre"                      .=? tagFieldToMaybeString (genre nextSongTags)
+        , "date"                       .=? tagFieldToMaybeString (date nextSongTags)
+        , "original_date"              .=? tagFieldToMaybeString (originalDate nextSongTags)
+        , "composer"                   .=? tagFieldToMaybeString (composer nextSongTags)
+        , "performer"                  .=? tagFieldToMaybeString (performer nextSongTags)
+        , "conductor"                  .=? tagFieldToMaybeString (conductor nextSongTags)
+        , "work"                       .=? tagFieldToMaybeString (work nextSongTags)
+        , "grouping"                   .=? tagFieldToMaybeString (grouping nextSongTags)
+        , "comment"                    .=? tagFieldToMaybeString (comment nextSongTags)
+        , "disc"                       .=? tagFieldToMaybeString (disc nextSongTags)
+        , "label"                      .=? tagFieldToMaybeString (label nextSongTags)
+        , "musicbrainz_artistid"       .=? tagFieldToMaybeString (musicbrainz_ArtistId nextSongTags)
+        , "musicbrainz_albumid"        .=? tagFieldToMaybeString (musicbrainz_AlbumId nextSongTags)
+        , "musicbrainz_albumartistid"  .=? tagFieldToMaybeString (musicbrainz_AlbumartistId nextSongTags)
+        , "musicbrainz_trackid"        .=? tagFieldToMaybeString (musicbrainz_TrackId nextSongTags)
+        , "musicbrainz_releasetrackid" .=? tagFieldToMaybeString (musicbrainz_ReleasetrackId nextSongTags)
+        , "musicbrainz_workid"         .=? tagFieldToMaybeString (musicbrainz_WorkId nextSongTags)
         ]
 
   let jNextObject = object [ "next" .= object [ "tags" .= jNextSongTagsObject ] ]
@@ -203,129 +204,31 @@ main = do
 
 customEncodeConf :: Config
 customEncodeConf = defConfig
-  { confCompare = keyOrder [ "title", "name"
-                           , "artist", "album_artist", "artist_sort", "album_artist_sort"
-                           , "album", "album_sort"
-                           , "track", "disc"
-                           , "date", "original_date"
-                           , "genre", "composer", "performer", "conductor"
-                           , "work", "grouping", "label"
-                           , "comment"
-                           , "musicbrainz_artistid"
-                           , "musicbrainz_albumid"
-                           , "musicbrainz_albumartistid"
-                           , "musicbrainz_trackid"
-                           , "musicbrainz_releasetrackid"
-                           , "musicbrainz_workid"
-                           -- status
-                           , "state", "repeat", "random", "single", "consume"
-                           , "duration", "elapsed", "elapsed_percent"
-                           , "volume", "audio_format", "bitrate"
-                           , "crossfade", "mixramp_db", "mixramp_delay"
-                           , "updating_db"
-                           , "error"
-                           -- playlist
-                           , "position", "next_position", "id", "next_id"
-                           , "length"
-                           ]
-  }
-
-
-
-
-data ExtractedTags = ExtractedTags
-  { artist                     :: Maybe String
-  , artistSort                 :: Maybe String
-  , album                      :: Maybe String
-  , albumSort                  :: Maybe String
-  , albumArtist                :: Maybe String
-  , albumArtistSort            :: Maybe String
-  , title                      :: Maybe String
-  , track                      :: Maybe String
-  , name                       :: Maybe String
-  , genre                      :: Maybe String
-  , date                       :: Maybe String
-  , originalDate               :: Maybe String
-  , composer                   :: Maybe String
-  , performer                  :: Maybe String
-  , conductor                  :: Maybe String
-  , work                       :: Maybe String
-  , grouping                   :: Maybe String
-  , comment                    :: Maybe String
-  , disc                       :: Maybe String
-  , label                      :: Maybe String
-  , musicbrainz_ArtistId       :: Maybe String
-  , musicbrainz_AlbumId        :: Maybe String
-  , musicbrainz_AlbumartistId  :: Maybe String
-  , musicbrainz_TrackId        :: Maybe String
-  , musicbrainz_ReleasetrackId :: Maybe String
-  , musicbrainz_WorkId         :: Maybe String
-  } deriving (Show, Eq)
-
-getAllTags :: (Metadata -> t -> Maybe String) -> t -> ExtractedTags
-getAllTags f s = ExtractedTags
-  { artist                     = f Artist                     s
-  , artistSort                 = f ArtistSort                 s
-  , album                      = f Album                      s
-  , albumSort                  = f AlbumSort                  s
-  , albumArtist                = f AlbumArtist                s
-  , albumArtistSort            = f AlbumArtistSort            s
-  , title                      = f Title                      s
-  , track                      = f Track                      s
-  , name                       = f Name                       s
-  , genre                      = f Genre                      s
-  , date                       = f Date                       s
-  , originalDate               = f OriginalDate               s
-  , composer                   = f Composer                   s
-  , performer                  = f Performer                  s
-  , conductor                  = f Conductor                  s
-  , work                       = f Work                       s
-  , grouping                   = f Grouping                   s
-  , comment                    = f Comment                    s
-  , disc                       = f Disc                       s
-  , label                      = f Label                      s
-  , musicbrainz_ArtistId       = f MUSICBRAINZ_ARTISTID       s
-  , musicbrainz_AlbumId        = f MUSICBRAINZ_ALBUMID        s
-  , musicbrainz_AlbumartistId  = f MUSICBRAINZ_ALBUMARTISTID  s
-  , musicbrainz_TrackId        = f MUSICBRAINZ_TRACKID        s
-  , musicbrainz_ReleasetrackId = f MUSICBRAINZ_RELEASETRACKID s
-  , musicbrainz_WorkId         = f MUSICBRAINZ_WORKID         s
-  }
-
-
--- example output of
--- ghci> withMpdOpts MPD.status >>= \x -> withMpdOpts $ MPD.playlistInfo $ getStatusIdInt MPD.stNextSongID x
---
--- Right
---   [ Song
---       { sgFilePath = Path "I/Ina Forsman/[2022] All There Is [16bit 44.1kHz FLAC]/06. One Night In Berlin.flac"
---       , sgTags = fromList
---           [ (Artist, [Value "Ina Forsman"])
---           , (ArtistSort, [Value "Forsman, Ina"])
---           , (Album, [Value "All There Is"])
---           , (AlbumArtist, [Value "Ina Forsman"])
---           , (AlbumArtistSort, [Value "Forsman, Ina"])
---           , (Title, [Value "One Night In Berlin"])
---           , (Track, [Value "6"])
---           , (Genre, [Value "R&B, Soul, Funk"])
---           , (Date, [Value "2022-06-25"])
---           , (OriginalDate, [Value "2022-06-25"])
---           , (Composer, [Value "Ina Forsman"])
---           , (Comment,
---               [ Value
---                   "{'Classical Extras': ...} (artists_options)"
---               ])
---           , (Disc, [Value "1"])
---           , (Label, [Value "Jazzhaus Records"])
---           , (MUSICBRAINZ_ARTISTID, [Value "f19fb535-3c91-4be8-8c14-ed06fa079f57"])
---           , (MUSICBRAINZ_ALBUMID, [Value "80083158-e00f-4fa5-913f-6ac452170870"])
---           , (MUSICBRAINZ_ALBUMARTISTID, [Value "f19fb535-3c91-4be8-8c14-ed06fa079f57"])
---           , (MUSICBRAINZ_TRACKID, [Value "86e28f16-047b-4e87-abc3-b7a34ff8f2fd"])
---           , (MUSICBRAINZ_RELEASETRACKID, [Value "94bf46b1-d216-403d-9e07-00084f83f85a"])
---           ]
---       , sgLastModified = Just 2024-03-21 08:24:25 UTC
---       , sgLength = 220
---       , sgId = Just (Id 284)
---       , sgIndex = Just 283
---       }
---   ]
+ { confCompare =
+   keyOrder
+ [ "title", "name"
+ , "artist", "album_artist", "artist_sort", "album_artist_sort"
+ , "album", "album_sort"
+ , "track", "disc"
+ , "date", "original_date"
+ , "genre", "composer", "performer", "conductor"
+ , "work", "grouping", "label"
+ , "comment"
+ , "musicbrainz_artistid"
+ , "musicbrainz_albumid"
+ , "musicbrainz_albumartistid"
+ , "musicbrainz_trackid"
+ , "musicbrainz_releasetrackid"
+ , "musicbrainz_workid"
+ -- status
+ , "state", "repeat", "random", "single", "consume"
+ , "duration", "elapsed", "elapsed_percent"
+ , "volume", "audio_format", "bitrate"
+ , "crossfade", "mixramp_db", "mixramp_delay"
+ , "updating_db"
+ , "error"
+ -- playlist
+ , "position", "next_position", "id", "next_id"
+ , "length"
+ ]
+ }
