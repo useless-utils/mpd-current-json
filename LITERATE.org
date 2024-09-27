@@ -33,15 +33,6 @@ import Options
        ( optsParserInfo, execParser, Opts(..), NextSongFlag(..) )
 
 import Network.MPD.Parse
-       -- ( getStatusField
-       -- , getStatusFieldElement
-       -- , getAllTags
-       -- , maybePathCurrentSong
-       -- , maybePathNextPlaylistSong
-       -- , (.=?)
-       -- , objectJson
-       -- , getStatusIdInt
-       -- , tagFieldToMaybeString )
 
 import Text.Read (readMaybe)
 import Data.Maybe (fromMaybe)
@@ -160,32 +151,32 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
   let currentSongTags = getAllTags $ Current cs
 
   let jCurrentSongTagsObject = objectJson
-        [ "artist"                     .=? tagFieldToMaybeString (artist currentSongTags)
-        , "artist_sort"                .=? tagFieldToMaybeString (artistSort currentSongTags)
-        , "album"                      .=? tagFieldToMaybeString (album currentSongTags)
-        , "album_sort"                 .=? tagFieldToMaybeString (albumSort currentSongTags)
-        , "album_artist"               .=? tagFieldToMaybeString (albumArtist currentSongTags)
-        , "album_artist_sort"          .=? tagFieldToMaybeString (albumArtistSort currentSongTags)
-        , "title"                      .=? tagFieldToMaybeString (title currentSongTags)
-        , "track"                      .=? tagFieldToMaybeString (track currentSongTags)
-        , "name"                       .=? tagFieldToMaybeString (name currentSongTags)
-        , "genre"                      .=? tagFieldToMaybeString (genre currentSongTags)
-        , "date"                       .=? tagFieldToMaybeString (date currentSongTags)
-        , "original_date"              .=? tagFieldToMaybeString (originalDate currentSongTags)
-        , "composer"                   .=? tagFieldToMaybeString (composer currentSongTags)
-        , "performer"                  .=? tagFieldToMaybeString (performer currentSongTags)
-        , "conductor"                  .=? tagFieldToMaybeString (conductor currentSongTags)
-        , "work"                       .=? tagFieldToMaybeString (work currentSongTags)
-        , "grouping"                   .=? tagFieldToMaybeString (grouping currentSongTags)
-        , "comment"                    .=? tagFieldToMaybeString (comment currentSongTags)
-        , "disc"                       .=? tagFieldToMaybeString (disc currentSongTags)
-        , "label"                      .=? tagFieldToMaybeString (label currentSongTags)
-        , "musicbrainz_artistid"       .=? tagFieldToMaybeString (musicbrainz_ArtistId currentSongTags)
-        , "musicbrainz_albumid"        .=? tagFieldToMaybeString (musicbrainz_AlbumId currentSongTags)
-        , "musicbrainz_albumartistid"  .=? tagFieldToMaybeString (musicbrainz_AlbumartistId currentSongTags)
-        , "musicbrainz_trackid"        .=? tagFieldToMaybeString (musicbrainz_TrackId currentSongTags)
+        [ "artist"                     .=? tagFieldToMaybeString (artist                     currentSongTags)
+        , "artist_sort"                .=? tagFieldToMaybeString (artistSort                 currentSongTags)
+        , "album"                      .=? tagFieldToMaybeString (album                      currentSongTags)
+        , "album_sort"                 .=? tagFieldToMaybeString (albumSort                  currentSongTags)
+        , "album_artist"               .=? tagFieldToMaybeString (albumArtist                currentSongTags)
+        , "album_artist_sort"          .=? tagFieldToMaybeString (albumArtistSort            currentSongTags)
+        , "title"                      .=? tagFieldToMaybeString (title                      currentSongTags)
+        , "track"                      .=? tagFieldToMaybeString (track                      currentSongTags)
+        , "name"                       .=? tagFieldToMaybeString (name                       currentSongTags)
+        , "genre"                      .=? tagFieldToMaybeString (genre                      currentSongTags)
+        , "date"                       .=? tagFieldToMaybeString (date                       currentSongTags)
+        , "original_date"              .=? tagFieldToMaybeString (originalDate               currentSongTags)
+        , "composer"                   .=? tagFieldToMaybeString (composer                   currentSongTags)
+        , "performer"                  .=? tagFieldToMaybeString (performer                  currentSongTags)
+        , "conductor"                  .=? tagFieldToMaybeString (conductor                  currentSongTags)
+        , "work"                       .=? tagFieldToMaybeString (work                       currentSongTags)
+        , "grouping"                   .=? tagFieldToMaybeString (grouping                   currentSongTags)
+        , "comment"                    .=? tagFieldToMaybeString (comment                    currentSongTags)
+        , "disc"                       .=? tagFieldToMaybeString (disc                       currentSongTags)
+        , "label"                      .=? tagFieldToMaybeString (label                      currentSongTags)
+        , "musicbrainz_artistid"       .=? tagFieldToMaybeString (musicbrainz_ArtistId       currentSongTags)
+        , "musicbrainz_albumid"        .=? tagFieldToMaybeString (musicbrainz_AlbumId        currentSongTags)
+        , "musicbrainz_albumartistid"  .=? tagFieldToMaybeString (musicbrainz_AlbumartistId  currentSongTags)
+        , "musicbrainz_trackid"        .=? tagFieldToMaybeString (musicbrainz_TrackId        currentSongTags)
         , "musicbrainz_releasetrackid" .=? tagFieldToMaybeString (musicbrainz_ReleasetrackId currentSongTags)
-        , "musicbrainz_workid"         .=? tagFieldToMaybeString (musicbrainz_WorkId currentSongTags)
+        , "musicbrainz_workid"         .=? tagFieldToMaybeString (musicbrainz_WorkId         currentSongTags)
         ]
 
   -- status
@@ -240,32 +231,32 @@ that supports =ByteString=​s.
   let nextSongTags = getAllTags $ Next nextPlaylistSong
 
   let jNextSongTagsObject = objectJson
-        [ "artist"                     .=? tagFieldToMaybeString (artist nextSongTags)
-        , "artist_sort"                .=? tagFieldToMaybeString (artistSort nextSongTags)
-        , "album"                      .=? tagFieldToMaybeString (album nextSongTags)
-        , "album_sort"                 .=? tagFieldToMaybeString (albumSort nextSongTags)
-        , "album_artist"               .=? tagFieldToMaybeString (albumArtist nextSongTags)
-        , "album_artist_sort"          .=? tagFieldToMaybeString (albumArtistSort nextSongTags)
-        , "title"                      .=? tagFieldToMaybeString (title nextSongTags)
-        , "track"                      .=? tagFieldToMaybeString (track nextSongTags)
-        , "name"                       .=? tagFieldToMaybeString (name nextSongTags)
-        , "genre"                      .=? tagFieldToMaybeString (genre nextSongTags)
-        , "date"                       .=? tagFieldToMaybeString (date nextSongTags)
-        , "original_date"              .=? tagFieldToMaybeString (originalDate nextSongTags)
-        , "composer"                   .=? tagFieldToMaybeString (composer nextSongTags)
-        , "performer"                  .=? tagFieldToMaybeString (performer nextSongTags)
-        , "conductor"                  .=? tagFieldToMaybeString (conductor nextSongTags)
-        , "work"                       .=? tagFieldToMaybeString (work nextSongTags)
-        , "grouping"                   .=? tagFieldToMaybeString (grouping nextSongTags)
-        , "comment"                    .=? tagFieldToMaybeString (comment nextSongTags)
-        , "disc"                       .=? tagFieldToMaybeString (disc nextSongTags)
-        , "label"                      .=? tagFieldToMaybeString (label nextSongTags)
-        , "musicbrainz_artistid"       .=? tagFieldToMaybeString (musicbrainz_ArtistId nextSongTags)
-        , "musicbrainz_albumid"        .=? tagFieldToMaybeString (musicbrainz_AlbumId nextSongTags)
-        , "musicbrainz_albumartistid"  .=? tagFieldToMaybeString (musicbrainz_AlbumartistId nextSongTags)
-        , "musicbrainz_trackid"        .=? tagFieldToMaybeString (musicbrainz_TrackId nextSongTags)
+        [ "artist"                     .=? tagFieldToMaybeString (artist                     nextSongTags)
+        , "artist_sort"                .=? tagFieldToMaybeString (artistSort                 nextSongTags)
+        , "album"                      .=? tagFieldToMaybeString (album                      nextSongTags)
+        , "album_sort"                 .=? tagFieldToMaybeString (albumSort                  nextSongTags)
+        , "album_artist"               .=? tagFieldToMaybeString (albumArtist                nextSongTags)
+        , "album_artist_sort"          .=? tagFieldToMaybeString (albumArtistSort            nextSongTags)
+        , "title"                      .=? tagFieldToMaybeString (title                      nextSongTags)
+        , "track"                      .=? tagFieldToMaybeString (track                      nextSongTags)
+        , "name"                       .=? tagFieldToMaybeString (name                       nextSongTags)
+        , "genre"                      .=? tagFieldToMaybeString (genre                      nextSongTags)
+        , "date"                       .=? tagFieldToMaybeString (date                       nextSongTags)
+        , "original_date"              .=? tagFieldToMaybeString (originalDate               nextSongTags)
+        , "composer"                   .=? tagFieldToMaybeString (composer                   nextSongTags)
+        , "performer"                  .=? tagFieldToMaybeString (performer                  nextSongTags)
+        , "conductor"                  .=? tagFieldToMaybeString (conductor                  nextSongTags)
+        , "work"                       .=? tagFieldToMaybeString (work                       nextSongTags)
+        , "grouping"                   .=? tagFieldToMaybeString (grouping                   nextSongTags)
+        , "comment"                    .=? tagFieldToMaybeString (comment                    nextSongTags)
+        , "disc"                       .=? tagFieldToMaybeString (disc                       nextSongTags)
+        , "label"                      .=? tagFieldToMaybeString (label                      nextSongTags)
+        , "musicbrainz_artistid"       .=? tagFieldToMaybeString (musicbrainz_ArtistId       nextSongTags)
+        , "musicbrainz_albumid"        .=? tagFieldToMaybeString (musicbrainz_AlbumId        nextSongTags)
+        , "musicbrainz_albumartistid"  .=? tagFieldToMaybeString (musicbrainz_AlbumartistId  nextSongTags)
+        , "musicbrainz_trackid"        .=? tagFieldToMaybeString (musicbrainz_TrackId        nextSongTags)
         , "musicbrainz_releasetrackid" .=? tagFieldToMaybeString (musicbrainz_ReleasetrackId nextSongTags)
-        , "musicbrainz_workid"         .=? tagFieldToMaybeString (musicbrainz_WorkId nextSongTags)
+        , "musicbrainz_workid"         .=? tagFieldToMaybeString (musicbrainz_WorkId         nextSongTags)
         ]
 
   let jNextObject = object [ "next" .= object [ "tags" .= jNextSongTagsObject ] ]
@@ -436,7 +427,7 @@ nextSongFlagCountOptParser =
   <> long "next"
   <> help ( concat
             [ "If used once (e.g. -n), include next song information in the output.\n"
-            , "if used twice (e.g. -nn) it's an alias for --next-only." ])
+            , "If used twice (e.g. -nn) it's an alias for --next-only." ])
 
 nextSongOnlyOptParser :: Parser NextSongFlag
 nextSongOnlyOptParser

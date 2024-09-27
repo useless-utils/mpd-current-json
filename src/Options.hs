@@ -96,7 +96,7 @@ nextSongFlagCountOptParser =
   <> long "next"
   <> help ( concat
             [ "If used once (e.g. -n), include next song information in the output.\n"
-            , "if used twice (e.g. -nn) it's an alias for --next-only." ])
+            , "If used twice (e.g. -nn) it's an alias for --next-only." ])
 
 nextSongOnlyOptParser :: Parser NextSongFlag
 nextSongOnlyOptParser
