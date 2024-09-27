@@ -7,7 +7,7 @@ import Network.MPD
        ( PlaybackState(Stopped, Playing, Paused) )
 import Data.Aeson ( object, KeyValue((.=)) )
 import Data.Aeson.Encode.Pretty
-       ( defConfig, encodePretty', keyOrder, Config(confCompare) )
+       ( defConfig, encodePretty', keyOrder, Config(..), Indent(..) )
 import qualified Data.ByteString.Lazy.Char8 as C
 import Text.Printf ( printf )
 import Options
@@ -206,31 +206,32 @@ main = do
 customEncodeConf :: Config
 customEncodeConf = defConfig
  { confCompare =
-   keyOrder
- [ "filename", "next_filename", "status", "playlist", "tags", "next"
- , "title", "name"
- , "artist", "album_artist", "artist_sort", "album_artist_sort"
- , "album", "album_sort"
- , "track", "disc"
- , "date", "original_date"
- , "genre", "composer", "performer", "conductor"
- , "work", "grouping", "label"
- , "comment"
- , "musicbrainz_artistid"
- , "musicbrainz_albumid"
- , "musicbrainz_albumartistid"
- , "musicbrainz_trackid"
- , "musicbrainz_releasetrackid"
- , "musicbrainz_workid"
- -- status
- , "state", "repeat", "random", "single", "consume"
- , "duration", "elapsed", "elapsed_percent"
- , "volume", "audio_format", "bitrate"
- , "crossfade", "mixramp_db", "mixramp_delay"
- , "updating_db"
- , "error"
- -- playlist
- , "id", "next_id", "position", "next_position"
- , "length"
- ]
+     keyOrder
+     [ "filename", "next_filename", "status", "playlist", "tags", "next"
+     , "title", "name"
+     , "artist", "album_artist", "artist_sort", "album_artist_sort"
+     , "album", "album_sort"
+     , "track", "disc"
+     , "date", "original_date"
+     , "genre", "composer", "performer", "conductor"
+     , "work", "grouping", "label"
+     , "comment"
+     , "musicbrainz_artistid"
+     , "musicbrainz_albumid"
+     , "musicbrainz_albumartistid"
+     , "musicbrainz_trackid"
+     , "musicbrainz_releasetrackid"
+     , "musicbrainz_workid"
+     -- status
+     , "state", "repeat", "random", "single", "consume"
+     , "duration", "elapsed", "elapsed_percent"
+     , "volume", "audio_format", "bitrate"
+     , "crossfade", "mixramp_db", "mixramp_delay"
+     , "updating_db"
+     , "error"
+     -- playlist
+     , "id", "next_id", "position", "next_position"
+     , "length"
+     ]
+ , confIndent = Spaces 2
  }
