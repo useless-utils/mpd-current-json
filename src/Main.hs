@@ -85,7 +85,7 @@ main = do
   -- sgTags
   let currentSongTags = getAllTags $ Current cs
 
-  let jCurrentSongTags = objectMaybes
+  let jsonCurrentSongTags = objectMaybes
         [ "artist"                     .=? tagFieldToMaybeString (artist                     currentSongTags)
         , "artist_sort"                .=? tagFieldToMaybeString (artistSort                 currentSongTags)
         , "album"                      .=? tagFieldToMaybeString (album                      currentSongTags)
@@ -115,7 +115,7 @@ main = do
         ]
 
   -- status
-  let jStatus = objectMaybes
+  let jsonStatus = objectMaybes
         [ "state"           .=? state
         , "repeat"          .=? repeatSt
         , "random"          .=? randomSt
@@ -136,7 +136,7 @@ main = do
 
   -- let jFilename = objectMaybes [ "file" .=? filename ]
 
-  let jPlaylist = objectMaybes
+  let jsonPlaylist = objectMaybes
         [ "position"      .=? pos  -- current song position
         , "next_position" .=? nextPos
         , "id"            .=? songId  -- current song id
@@ -146,7 +146,7 @@ main = do
 
   let nextSongTags = getAllTags $ Next nextPlaylistSong
 
-  let jNextSongTags = objectMaybes
+  let jsonNextSongTags = objectMaybes
         [ "artist"                     .=? tagFieldToMaybeString (artist                     nextSongTags)
         , "artist_sort"                .=? tagFieldToMaybeString (artistSort                 nextSongTags)
         , "album"                      .=? tagFieldToMaybeString (album                      nextSongTags)
@@ -175,33 +175,23 @@ main = do
         , "musicbrainz_workid"         .=? tagFieldToMaybeString (musicbrainz_WorkId         nextSongTags)
         ]
 
-  let jObject = object [ "filename"      .= filename
-                       , "next_filename" .= filenameNext
-                       , "playlist"      .= jPlaylist
-                       , "status"        .= jStatus
-                       , "tags"          .= jCurrentSongTags
-                       ]
-  let jObjectBoth = object [ "filename"      .= filename
-                           , "next_filename" .= filenameNext
-                           , "playlist"      .= jPlaylist
-                           , "status"        .= jStatus
-                           , "tags"          .= jCurrentSongTags
-                           , "next"          .= object [ "tags" .= jNextSongTags ]
-                           ]
-  let jObjectNextOnly = object [ "filename"      .= filename
-                               , "next_filename" .= filenameNext
-                               , "playlist"      .= jPlaylist
-                               , "status"        .= jStatus
-                               , "tags"          .= jNextSongTags
-                               ]
+  let jsonBaseObject tags = object
+                $ [ "filename"      .= filename
+                  , "next_filename" .= filenameNext
+                  , "playlist"      .= jsonPlaylist
+                  , "status"        .= jsonStatus
+                  ] ++ tags
 
-  let printJson j = C.putStrLn $ encodePretty' customEncodeConf j
+  let printJson tags = C.putStrLn
+                       $ encodePretty' customEncodeConf
+                       $ jsonBaseObject tags
 
   case optNext opts of
-    NoNextSong -> printJson jObject
-    OnlyNextSong -> printJson jObjectNextOnly
-    IncludeNextSong -> do printJson jObjectBoth
-    where
+    NoNextSong -> printJson [ "tags" .= jsonCurrentSongTags ]
+
+    OnlyNextSong -> printJson [ "tags" .= jsonNextSongTags ]
+    IncludeNextSong -> printJson [ "tags" .= jsonCurrentSongTags
+                                 , "next" .= object [ "tags" .= jsonNextSongTags ] ]
 
 customEncodeConf :: Config
 customEncodeConf = defConfig

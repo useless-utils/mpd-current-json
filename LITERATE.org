@@ -150,7 +150,7 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
   -- sgTags
   let currentSongTags = getAllTags $ Current cs
 
-  let jCurrentSongTags = objectMaybes
+  let jsonCurrentSongTags = objectMaybes
         [ "artist"                     .=? tagFieldToMaybeString (artist                     currentSongTags)
         , "artist_sort"                .=? tagFieldToMaybeString (artistSort                 currentSongTags)
         , "album"                      .=? tagFieldToMaybeString (album                      currentSongTags)
@@ -180,7 +180,7 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
         ]
 
   -- status
-  let jStatus = objectMaybes
+  let jsonStatus = objectMaybes
         [ "state"           .=? state
         , "repeat"          .=? repeatSt
         , "random"          .=? randomSt
@@ -201,7 +201,7 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
 
   -- let jFilename = objectMaybes [ "file" .=? filename ]
 
-  let jPlaylist = objectMaybes
+  let jsonPlaylist = objectMaybes
         [ "position"      .=? pos  -- current song position
         , "next_position" .=? nextPos
         , "id"            .=? songId  -- current song id
@@ -211,7 +211,7 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
 
   let nextSongTags = getAllTags $ Next nextPlaylistSong
 
-  let jNextSongTags = objectMaybes
+  let jsonNextSongTags = objectMaybes
         [ "artist"                     .=? tagFieldToMaybeString (artist                     nextSongTags)
         , "artist_sort"                .=? tagFieldToMaybeString (artistSort                 nextSongTags)
         , "album"                      .=? tagFieldToMaybeString (album                      nextSongTags)
@@ -244,25 +244,16 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
 Having two objects, one for "tags" and other for "status", create a
 nested JSON with labels before each of them.
 #+begin_src haskell
-  let jObject = object [ "filename"      .= filename
-                       , "next_filename" .= filenameNext
-                       , "playlist"      .= jPlaylist
-                       , "status"        .= jStatus
-                       , "tags"          .= jCurrentSongTags
-                       ]
-  let jObjectBoth = object [ "filename"      .= filename
-                           , "next_filename" .= filenameNext
-                           , "playlist"      .= jPlaylist
-                           , "status"        .= jStatus
-                           , "tags"          .= jCurrentSongTags
-                           , "next"          .= object [ "tags" .= jNextSongTags ]
-                           ]
-  let jObjectNextOnly = object [ "filename"      .= filename
-                               , "next_filename" .= filenameNext
-                               , "playlist"      .= jPlaylist
-                               , "status"        .= jStatus
-                               , "tags"          .= jNextSongTags
-                               ]
+  let jsonBaseObject tags = object
+                $ [ "filename"      .= filename
+                  , "next_filename" .= filenameNext
+                  , "playlist"      .= jsonPlaylist
+                  , "status"        .= jsonStatus
+                  ] ++ tags
+
+  let printJson tags = C.putStrLn
+                       $ encodePretty' customEncodeConf
+                       $ jsonBaseObject tags
 #+end_src
 e.g. so they can be parsed as "=.tags.title=" or
 "=.status.elapsed_percent=".
@@ -272,13 +263,12 @@ terminal. =Data.Aeson='s encoding is returned as a =ByteString= so use the
 =Data.ByteString...= import that provides an implementation of =putStrLn=
 that supports =ByteString=​s.
 #+begin_src haskell
-  let printJson j = C.putStrLn $ encodePretty' customEncodeConf j
-
   case optNext opts of
-    NoNextSong -> printJson jObject
-    OnlyNextSong -> printJson jObjectNextOnly
-    IncludeNextSong -> do printJson jObjectBoth
-    where
+    NoNextSong -> printJson [ "tags" .= jsonCurrentSongTags ]
+
+    OnlyNextSong -> printJson [ "tags" .= jsonNextSongTags ]
+    IncludeNextSong -> printJson [ "tags" .= jsonCurrentSongTags
+                                 , "next" .= object [ "tags" .= jsonNextSongTags ] ]
 #+end_src
 where ~customEncodeConf~ is an override for the
 ~Data.Aeson.Encode.Pretty~'s [[https://hackage.haskell.org/package/aeson-pretty-0.8.10/docs/Data-Aeson-Encode-Pretty.html#t:Config][Config]] data record. +This is really
