@@ -115,9 +115,9 @@ main = do
   -- let jFilename = objectMaybes [ "file" .=? filename ]
 
   let jsonPlaylist = objectMaybes
-        [ "position"      .=? pos  -- current song position
+        [ "position"      .=? pos
         , "next_position" .=? nextPos
-        , "id"            .=? songId  -- current song id
+        , "id"            .=? songId
         , "next_id"       .=? nextId
         , "length"        .=? playlistLength
         ]
@@ -144,7 +144,9 @@ customEncodeConf :: Config
 customEncodeConf = defConfig
  { confCompare =
      keyOrder
+     -- top level labels
      [ "filename", "next_filename", "status", "playlist", "tags", "next"
+     -- tags
      , "title", "name"
      , "artist", "album_artist", "artist_sort", "album_artist_sort"
      , "album", "album_sort"
