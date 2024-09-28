@@ -46,8 +46,8 @@ data Opts = Opts  -- ^ Custom data record for storing 'Options.Applicative.Parse
   }
 
 data NextSongFlag = IncludeNextSong
-              | OnlyNextSong
-              | NoNextSong
+                  | OnlyNextSong
+                  | NoNextSong
 
 optsParser :: Parser Opts
 optsParser

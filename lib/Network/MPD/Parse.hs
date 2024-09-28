@@ -1,21 +1,99 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Network.MPD.Parse
-       -- ( getStatusField
-       -- , getStatusFieldElement
-       -- , getAllTags
-       -- , maybePathCurrentSong
-       -- , maybePathNextPlaylistSong
-       -- , (.=?)
-       -- , objectMaybes
-       -- , getStatusIdInt
-       -- , tagFieldToMaybeString )
+  ( TagField (..)
+  , ExtractedTags (..)
+  , getAllTags
+  , getStatusField
+  , getStatusFieldElement
+  , SongCurrentOrNext(..)
+  , getTag
+  , songToTagField
+  , maybePathCurrentSong
+  , maybePathNextPlaylistSong
+  , singleValueToString
+  , multiValueToString
+  , getStatusIdInt
+  )
 where
+
+
 
 import qualified Network.MPD as MPD
 import Network.MPD
        ( Metadata(..), Song, PlaybackState(Stopped, Playing, Paused) )
-import Data.Aeson ( object, Key, KeyValue(..), ToJSON, Value )
-import Data.Aeson.Types ( Pair )
-import Data.Maybe ( catMaybes, fromMaybe )
+import Data.Maybe ( fromMaybe )
+import Data.List ( (!?) )
+
+-- | Wrapper for the output of 'getTag', which internally uses
+-- 'Network.MPD.sgGetTag' to retrieve @Maybe@
+-- ['Network.MPD.Value']. The list handles multi-value tags like
+-- multiple artists.
+data TagField = SingleTagField !(Maybe String)
+              | MultiTagField !(Maybe [String])
+  deriving (Show, Eq)
+
+{- | Store the parsed output of 'getTag'.
+-}
+data ExtractedTags = ExtractedTags
+  { artist                     :: !TagField
+  , artistSort                 :: !TagField
+  , album                      :: !TagField
+  , albumSort                  :: !TagField
+  , albumArtist                :: !TagField
+  , albumArtistSort            :: !TagField
+  , title                      :: !TagField
+  , track                      :: !TagField
+  , name                       :: !TagField
+  , genre                      :: !TagField
+  , date                       :: !TagField
+  , originalDate               :: !TagField
+  , composer                   :: !TagField
+  , performer                  :: !TagField
+  , conductor                  :: !TagField
+  , work                       :: !TagField
+  , grouping                   :: !TagField
+  , comment                    :: !TagField
+  , disc                       :: !TagField
+  , label                      :: !TagField
+  , musicbrainz_ArtistId       :: !TagField
+  , musicbrainz_AlbumId        :: !TagField
+  , musicbrainz_AlbumartistId  :: !TagField
+  , musicbrainz_TrackId        :: !TagField
+  , musicbrainz_ReleasetrackId :: !TagField
+  , musicbrainz_WorkId         :: !TagField
+  }
+
+getAllTags :: SongCurrentOrNext -> ExtractedTags
+getAllTags s = ExtractedTags
+  { artist                     = f Artist                     s
+  , artistSort                 = f ArtistSort                 s
+  , album                      = f Album                      s
+  , albumSort                  = f AlbumSort                  s
+  , albumArtist                = f AlbumArtist                s
+  , albumArtistSort            = f AlbumArtistSort            s
+  , title                      = f Title                      s
+  , track                      = f Track                      s
+  , name                       = f Name                       s
+  , genre                      = f Genre                      s
+  , date                       = f Date                       s
+  , originalDate               = f OriginalDate               s
+  , composer                   = f Composer                   s
+  , performer                  = f Performer                  s
+  , conductor                  = f Conductor                  s
+  , work                       = f Work                       s
+  , grouping                   = f Grouping                   s
+  , comment                    = f Comment                    s
+  , disc                       = f Disc                       s
+  , label                      = f Label                      s
+  , musicbrainz_ArtistId       = f MUSICBRAINZ_ARTISTID       s
+  , musicbrainz_AlbumId        = f MUSICBRAINZ_ALBUMID        s
+  , musicbrainz_AlbumartistId  = f MUSICBRAINZ_ALBUMARTISTID  s
+  , musicbrainz_TrackId        = f MUSICBRAINZ_TRACKID        s
+  , musicbrainz_ReleasetrackId = f MUSICBRAINZ_RELEASETRACKID s
+  , musicbrainz_WorkId         = f MUSICBRAINZ_WORKID         s
+  }
+  where
+    f = getTag
 
 {- | Extract a field from the returned MPD.Status data record.
 
@@ -62,32 +140,22 @@ data SongCurrentOrNext = Current !CurrentSong
 getTag :: Metadata -> SongCurrentOrNext -> TagField
 getTag tag (Current song) =
   case song of
-    Left _ -> TagField Nothing
+    Left _ -> SingleTagField Nothing
     Right (Just s) -> songToTagField tag s
 getTag tag (Next song) =
   case song of
     Right [s] -> songToTagField tag s
-    Left _    -> TagField Nothing
-    _any      -> TagField Nothing
+    Left _    -> SingleTagField Nothing
+    _any      -> SingleTagField Nothing
 
-songToTagField t s = TagField $ valueToString =<< headMay =<< MPD.sgGetTag t s
--- TagField $ valueToString =<< headMay =<< MPD.sgGetTag tag s
-
-getTagNextSong :: Metadata -> Either a [Song] -> TagField
-getTagNextSong tag song =
-  case song of
-    Right [s] -> TagField $ MPD.sgGetTag tag s >>= headMay >>= valueToString
-    Left _    -> TagField Nothing
-    _any      -> TagField Nothing
-
-{- | Use 'Network.MPD.sgGetTag' to extract a @tag@ from a @song@, safely
-get only the head item of the returned @Maybe@ list, then safely
-convert it to a string.
--}
-processSong :: Metadata -> Maybe Song -> Maybe String
-processSong _ Nothing = Nothing
-processSong tag (Just song) =
-  valueToString =<< headMay =<< MPD.sgGetTag tag song
+songToTagField :: Metadata -> Song -> TagField
+songToTagField t s = outtag
+  where
+    outtag = tagSingleOrList (MPD.sgGetTag t s)
+    tagSingleOrList :: Maybe [MPD.Value] -> TagField
+    tagSingleOrList val | fmap length val == Just 1 = SingleTagField $ singleValueToString $ (fromMaybe [] val) !? 0
+                        | fmap length val > Just 1 = MultiTagField $ multiValueToString val
+                        | otherwise = SingleTagField Nothing
 
 {- | Get the current 'Network.MPD.Song' relative path with 'Network.MPD.sgFilePath'
 -}
@@ -108,12 +176,6 @@ maybePathNextPlaylistSong (Right [])      = Nothing
 maybePathNextPlaylistSong (Right (_:_:_)) = Nothing
 maybePathNextPlaylistSong (Right [s]) =  Just $ MPD.toString $ MPD.sgFilePath s
 
-{- | Safely get the head of a list. Same as [Safe.headMay](Safe#headMay).
--}
-headMay :: [a] -> Maybe a
-headMay []    = Nothing
-headMay (x:_) = Just x
-
 {- | Convert 'Network.MPD.Value' to @String@ within a @Maybe@ context.
 
 This @Value@ is from 'Network.MPD' and is basically the same as a
@@ -133,38 +195,13 @@ processSong tag (Just song) = do
 'Network.MPD.toString' that can convert, along other types, a
 'Network.MPD.Value' to a @String@.
 -}
-valueToString :: MPD.Value -> Maybe String
-valueToString x = Just (MPD.toString x)
+singleValueToString :: Maybe MPD.Value -> Maybe String
+singleValueToString (Just x) = Just (MPD.toString x)
+singleValueToString Nothing = Nothing
 
-{- | Check if @Maybe v@ exists and is of type expected by
-'Data.Aeson.object' as defined in 'Data.Aeson.Value', if it is return
-both the @key@ and @value@ within the @Maybe@ context tied with
-'Data.Aeson..='. This gives support to \'optional\' fields using
-'Data.Maybe.catMaybes' that discard @Nothing@ values and is meant to
-prevent creating JSON key/value pairs with @null@ values, e.g.:
-
-@
-jsonTags = object . catMaybes $
-    [ "artist"  .=? artist
-    , "album"   .=? album
-    , "title"   .=? title
-    ]
-@
-
-Where if a value on the right is @Nothing@ that key/value pair will
-not be included in 'Data.Aeson.object' because of
-'Data.Maybe.catMaybes'.
--}
-(.=?) :: (KeyValue e a, ToJSON v) => Key -> Maybe v -> Maybe a
-key .=? Just value = Just (key .= value)
-_   .=? Nothing    = Nothing
-infixr 8 .=?
-
--- | Helper function for creating an JSON 'Data.Aeson.object' where
--- 'Data.Maybe.catMaybes' won't include items from the '[Maybe Pair]'
--- list that return 'Nothing'.
-objectMaybes :: [Maybe Pair] -> Value
-objectMaybes = object . catMaybes
+multiValueToString :: Maybe [MPD.Value] -> Maybe [String]
+multiValueToString (Just x) = Just $ map MPD.toString x
+multiValueToString Nothing = Nothing
 
 -- | Extracts the 'Int' value from an 'MPD.Id' within 'MPD.Status', if
 -- present and the 'Either' value is a 'Right'.
@@ -175,79 +212,3 @@ getStatusIdInt item status =
     Nothing -> Nothing
   where
     m = fromMaybe Nothing $ getStatusField status item
-
-
-
-
-
--- #TODO new heading
-
-newtype TagField = TagField (Maybe String)
-
-data ExtractedTags = ExtractedTags
-  { artist                     :: !TagField
-  , artistSort                 :: !TagField
-  , album                      :: !TagField
-  , albumSort                  :: !TagField
-  , albumArtist                :: !TagField
-  , albumArtistSort            :: !TagField
-  , title                      :: !TagField
-  , track                      :: !TagField
-  , name                       :: !TagField
-  , genre                      :: !TagField
-  , date                       :: !TagField
-  , originalDate               :: !TagField
-  , composer                   :: !TagField
-  , performer                  :: !TagField
-  , conductor                  :: !TagField
-  , work                       :: !TagField
-  , grouping                   :: !TagField
-  , comment                    :: !TagField
-  , disc                       :: !TagField
-  , label                      :: !TagField
-  , musicbrainz_ArtistId       :: !TagField
-  , musicbrainz_AlbumId        :: !TagField
-  , musicbrainz_AlbumartistId  :: !TagField
-  , musicbrainz_TrackId        :: !TagField
-  , musicbrainz_ReleasetrackId :: !TagField
-  , musicbrainz_WorkId         :: !TagField
-  }
-
-tagFieldToMaybeString :: TagField -> Maybe String
-tagFieldToMaybeString (TagField ms) = ms
-
-maybeStringToTagField :: Maybe String -> TagField
-maybeStringToTagField (Just ms) = TagField (Just ms)
-maybeStringToTagField Nothing = TagField Nothing
-
-getAllTags :: SongCurrentOrNext -> ExtractedTags
-getAllTags s = ExtractedTags
-  { artist                     = f Artist                     s
-  , artistSort                 = f ArtistSort                 s
-  , album                      = f Album                      s
-  , albumSort                  = f AlbumSort                  s
-  , albumArtist                = f AlbumArtist                s
-  , albumArtistSort            = f AlbumArtistSort            s
-  , title                      = f Title                      s
-  , track                      = f Track                      s
-  , name                       = f Name                       s
-  , genre                      = f Genre                      s
-  , date                       = f Date                       s
-  , originalDate               = f OriginalDate               s
-  , composer                   = f Composer                   s
-  , performer                  = f Performer                  s
-  , conductor                  = f Conductor                  s
-  , work                       = f Work                       s
-  , grouping                   = f Grouping                   s
-  , comment                    = f Comment                    s
-  , disc                       = f Disc                       s
-  , label                      = f Label                      s
-  , musicbrainz_ArtistId       = f MUSICBRAINZ_ARTISTID       s
-  , musicbrainz_AlbumId        = f MUSICBRAINZ_ALBUMID        s
-  , musicbrainz_AlbumartistId  = f MUSICBRAINZ_ALBUMARTISTID  s
-  , musicbrainz_TrackId        = f MUSICBRAINZ_TRACKID        s
-  , musicbrainz_ReleasetrackId = f MUSICBRAINZ_RELEASETRACKID s
-  , musicbrainz_WorkId         = f MUSICBRAINZ_WORKID         s
-  }
-  where
-    f = getTag
