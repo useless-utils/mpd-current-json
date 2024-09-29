@@ -15,12 +15,18 @@ import qualified Data.ByteString.Lazy.Char8 as C
 import Data.Aeson.Types ( Pair )
 import Data.Maybe ( catMaybes )
 
--- | Helper function for creating an JSON 'Data.Aeson.object' where
--- 'Data.Maybe.catMaybes' won't include items from the '[Maybe Pair]'
--- list that return 'Nothing'.
+{- | Helper function for creating an JSON 'Data.Aeson.object' where
+'Data.Maybe.catMaybes' won't include items from the @[Maybe
+'Data.Aeson.Types.Pair']@ list that return 'Nothing'.
+
+Meant for using with the '(.=?)' operator to remove JSON values from
+the output that would contain @null@ otherwise.
+-}
 objectMaybes :: [Maybe Pair] -> Value
 objectMaybes = object . catMaybes
 
+-- | Create a 'Data.Aeson.Value' that can be encoded into a
+-- @ByteString@ of conventional JSON with 'Data.Aeson.encode'.
 jsonSongTags :: ExtractedTags -> Value
 jsonSongTags song = objectMaybes
   [ "artist"            .=? tagFieldToJSON (artist          song)
@@ -51,6 +57,10 @@ jsonSongTags song = objectMaybes
   , "musicbrainz_workid"         .=? tagFieldToJSON (musicbrainz_WorkId         song)
   ]
 
+-- | Convert constructor arguments of 'TagField', specially @String@
+-- or @[String]@ under @Maybe@, into a 'Data.Aeson.Value' supported
+-- for encoding. Since 'jsonSongTags' expects @Maybe Value@, extract
+-- them from 'TagField'.
 tagFieldToJSON :: TagField -> Maybe Value
 tagFieldToJSON (SingleTagField ms) = toJSON <$> ms
 tagFieldToJSON (MultiTagField ml) = toJSON <$> ml

@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Network.MPD.Parse
   ( TagField (..)
   , ExtractedTags (..)
@@ -16,23 +15,24 @@ module Network.MPD.Parse
   )
 where
 
-
-
 import qualified Network.MPD as MPD
 import Network.MPD
        ( Metadata(..), Song, PlaybackState(Stopped, Playing, Paused) )
 import Data.Maybe ( fromMaybe )
 import Data.List ( (!?) )
 
--- | Wrapper for the output of 'getTag', which internally uses
--- 'Network.MPD.sgGetTag' to retrieve @Maybe@
--- ['Network.MPD.Value']. The list handles multi-value tags like
--- multiple artists.
+{- | Wrapper for the output of 'getTag', which internally uses
+'Network.MPD.sgGetTag' to retrieve @Maybe@ ['Network.MPD.Value'] that
+are then converted to @TagField@. This allows handling multi-value
+tags like multiple artists.
+-}
 data TagField = SingleTagField !(Maybe String)
               | MultiTagField !(Maybe [String])
   deriving (Show, Eq)
 
 {- | Store the parsed output of 'getTag'.
+
+Each field represents a supported MPD tag.
 -}
 data ExtractedTags = ExtractedTags
   { artist                     :: !TagField
@@ -63,6 +63,11 @@ data ExtractedTags = ExtractedTags
   , musicbrainz_WorkId         :: !TagField
   }
 
+{- | Assign 'getTag' returned values to 'ExtractedTags'.
+
+Takes either a song @Current s@ or @Next s@, because their object
+format differs, see 'SongCurrentOrNext'.
+-}
 getAllTags :: SongCurrentOrNext -> ExtractedTags
 getAllTags s = ExtractedTags
   { artist                     = f Artist                     s
@@ -95,13 +100,12 @@ getAllTags s = ExtractedTags
   where
     f = getTag
 
-{- | Extract a field from the returned MPD.Status data record.
+{- | Extract a field from the returned 'Network.MPD.Status' data record.
 
-Helper to extract a specific field from the
-[Network.MPD.Status](Network.MPD#Status) data record by providing the
-corresponding field label. If the input status "@st@" is /not/ @Right a@,
-indicating an error, or the field label function is not applicable, it
-returns @Nothing@.
+Helper to extract a specific field from the 'Network.MPD.Status' data
+record by providing the corresponding field label. If the input status
+"@st@" is /not/ @Right a@, indicating an error, or the field label
+function is not applicable, it returns @Nothing@.
 
 ==== __Example__:
 
@@ -131,12 +135,19 @@ Just 100
 getStatusFieldElement :: MPD.Response MPD.Status -> (MPD.Status -> Maybe a) -> Maybe a
 getStatusFieldElement status item = fromMaybe Nothing $ getStatusField status item
 
+-- | Alias for the output of 'Network.MPD.currentSong'.
 type CurrentSong = MPD.Response (Maybe Song)
+
+-- | Alias for the output of 'Network.MPD.playlistInfo'.
 type NextSong = MPD.Response [Song]
 
+-- | Wrapper for 'getTag' to expect either @Maybe Song@ or
+-- @[Song]@. This simplifies 'getAllTags'.
 data SongCurrentOrNext = Current !CurrentSong
                        | Next !NextSong
 
+-- | Retrieve @tag@, which should be one of 'Network.MPD.Metadata', from
+-- 'CurrentSong' or 'NextSong'.
 getTag :: Metadata -> SongCurrentOrNext -> TagField
 getTag tag (Current song) =
   case song of
@@ -148,14 +159,39 @@ getTag tag (Next song) =
     Left _    -> SingleTagField Nothing
     _any      -> SingleTagField Nothing
 
+{- | Extract a @tag@ 'Network.MPD.Value' from 'Network.MPD.Song' using
+'Network.MPD.sgGetTag', convert the output to either @Maybe String@ or
+@Maybe [String]@ and wrap it in 'TagField'.
+
+Because 'Network.MPD.sgGetTag' returns @Maybe@ ['Network.MPD.Value']
+where @Value@ is an instance of @ByteString@ it also offers helper
+conversion functions, so convert it to @String@ if the field only
+contains a list of one value or convert all ['Network.MPD.Value'] list
+items to @String@ and return the list.
+-}
 songToTagField :: Metadata -> Song -> TagField
-songToTagField t s = outtag
+songToTagField tag song = tagSingleOrList (MPD.sgGetTag tag song)
   where
-    outtag = tagSingleOrList (MPD.sgGetTag t s)
     tagSingleOrList :: Maybe [MPD.Value] -> TagField
     tagSingleOrList val | fmap length val == Just 1 = SingleTagField $ singleValueToString $ (fromMaybe [] val) !? 0
                         | fmap length val > Just 1 = MultiTagField $ multiValueToString val
                         | otherwise = SingleTagField Nothing
+
+{- | Convert 'Network.MPD.Value' to @String@ within a @Maybe@ context.
+
+'MPD.sgGetTag' returns a @Maybe [Value]@. [libmpd](Network.MPD) also
+provides 'Network.MPD.toString' that can also, along with @ByteString@
+and @Text@, convert a 'Network.MPD.Value' to a @String@.
+-}
+singleValueToString :: Maybe MPD.Value -> Maybe String
+singleValueToString (Just x) = Just (MPD.toString x)
+singleValueToString Nothing = Nothing
+
+-- | Same as 'singleValueToString' but converts all @Value@s in the
+-- multi-value-tag list to @String@ and returns the list.
+multiValueToString :: Maybe [MPD.Value] -> Maybe [String]
+multiValueToString (Just x) = Just $ map MPD.toString x
+multiValueToString Nothing = Nothing
 
 {- | Get the current 'Network.MPD.Song' relative path with 'Network.MPD.sgFilePath'
 -}
@@ -176,35 +212,8 @@ maybePathNextPlaylistSong (Right [])      = Nothing
 maybePathNextPlaylistSong (Right (_:_:_)) = Nothing
 maybePathNextPlaylistSong (Right [s]) =  Just $ MPD.toString $ MPD.sgFilePath s
 
-{- | Convert 'Network.MPD.Value' to @String@ within a @Maybe@ context.
-
-This @Value@ is from 'Network.MPD' and is basically the same as a
-@String@ but used internally to store metadata values.
-
-==== __Example__:
-
-@
-processSong :: Metadata -> Maybe Song -> Maybe String
-processSong _ Nothing = Nothing
-processSong tag (Just song) = do
-  let tagVal = MPD.sgGetTag tag song
-  valueToString =<< (headMay =<< tagVal)
-@
-
-'MPD.sgGetTag' returns a @Maybe [Value]@. [libmpd](Network.MPD) also provides
-'Network.MPD.toString' that can convert, along other types, a
-'Network.MPD.Value' to a @String@.
--}
-singleValueToString :: Maybe MPD.Value -> Maybe String
-singleValueToString (Just x) = Just (MPD.toString x)
-singleValueToString Nothing = Nothing
-
-multiValueToString :: Maybe [MPD.Value] -> Maybe [String]
-multiValueToString (Just x) = Just $ map MPD.toString x
-multiValueToString Nothing = Nothing
-
--- | Extracts the 'Int' value from an 'MPD.Id' within 'MPD.Status', if
--- present and the 'Either' value is a 'Right'.
+-- | Extracts the 'Int' value from an 'Network.MPD.Id' within
+-- 'Network.MPD.Status', if present and the 'Either' value is 'Right'.
 getStatusIdInt :: (MPD.Status -> Maybe MPD.Id) -> Either MPD.MPDError MPD.Status -> Maybe Int
 getStatusIdInt item status =
   case m of
