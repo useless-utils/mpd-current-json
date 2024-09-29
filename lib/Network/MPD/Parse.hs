@@ -18,8 +18,7 @@ where
 import qualified Network.MPD as MPD
 import Network.MPD
        ( Metadata(..), Song, PlaybackState(Stopped, Playing, Paused) )
-import Data.Maybe ( fromMaybe )
-import Data.List ( (!?) )
+import Data.Maybe ( fromMaybe, listToMaybe )
 
 {- | Wrapper for the output of 'getTag', which internally uses
 'Network.MPD.sgGetTag' to retrieve @Maybe@ ['Network.MPD.Value'] that
@@ -173,7 +172,7 @@ songToTagField :: Metadata -> Song -> TagField
 songToTagField tag song = tagSingleOrList (MPD.sgGetTag tag song)
   where
     tagSingleOrList :: Maybe [MPD.Value] -> TagField
-    tagSingleOrList val | fmap length val == Just 1 = SingleTagField $ singleValueToString $ (fromMaybe [] val) !? 0
+    tagSingleOrList val | fmap length val == Just 1 = SingleTagField $ singleValueToString $ listToMaybe (fromMaybe [] val)
                         | fmap length val > Just 1 = MultiTagField $ multiValueToString val
                         | otherwise = SingleTagField Nothing
 

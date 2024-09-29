@@ -1,3 +1,7 @@
+# v2.0.0.1
+- Fix internal use of function unsupported in `base` version <4.19.
+- Add `-O2` compilation flag to cabal file that benefits from v2.0 refactor.
+
 # v2.0
 - Major code rewrite.
 - Add command-line flags:

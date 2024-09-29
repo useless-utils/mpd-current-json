@@ -503,17 +503,19 @@ where
 import qualified Network.MPD as MPD
 import Network.MPD
        ( Metadata(..), Song, PlaybackState(Stopped, Playing, Paused) )
-import Data.Maybe ( fromMaybe )
-import Data.List ( (!?) )
+import Data.Maybe ( fromMaybe, listToMaybe )
 #+end_src
 
 Define a data record for storing parsed tags as =Maybe String= or =Maybe
 [String]=, this works because even though =String= and =[String]= are
 different, [[https://hackage.haskell.org/package/aeson/docs/Data-Aeson.html#t:Value][Data.Aeson.Value]] support various different types for
-encoding them into the different JSON types. At first =TagField= was
-just an alias for =Maybe String= but later adding support for
-multi-value tags, to be able to store /either/ of them in them same data
-record field custom type representing both was very useful.
+encoding them into the different JSON types. The supported types can
+be converted into =Values= using =toJSON=.
+
+At first =TagField= was just an alias for =Maybe String= but later adding
+support for multi-value tags, to be able to store /either/ of them in
+them same data record field custom type representing both was very
+useful.
 
 This approach greatly improved performance when comparing to doing
 everything in a =IO= block.
@@ -697,7 +699,7 @@ songToTagField :: Metadata -> Song -> TagField
 songToTagField tag song = tagSingleOrList (MPD.sgGetTag tag song)
   where
     tagSingleOrList :: Maybe [MPD.Value] -> TagField
-    tagSingleOrList val | fmap length val == Just 1 = SingleTagField $ singleValueToString $ (fromMaybe [] val) !? 0
+    tagSingleOrList val | fmap length val == Just 1 = SingleTagField $ singleValueToString $ listToMaybe (fromMaybe [] val)
                         | fmap length val > Just 1 = MultiTagField $ multiValueToString val
                         | otherwise = SingleTagField Nothing
 #+end_src
@@ -893,7 +895,7 @@ name:               mpd-current-json
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            2.0.0.0
+version:            2.0.0.1
 synopsis:           Print current MPD song and status as JSON
 
 tested-with: GHC == { 9.10.1, 9.4.8 }
@@ -967,10 +969,15 @@ executable mpd-current-json
                     -Wunused-packages
                     -fwrite-ide-info
                     -hiedir=.hie
+                    -O2
 #+end_src
 
 * Changelog
 #+begin_src markdown :tangle CHANGELOG.md
+# v2.0.0.1
+- Fix internal use of function unsupported in `base` version <4.19.
+- Add `-O2` compilation flag to cabal file that benefits from v2.0 refactor.
+
 # v2.0
 - Major code rewrite.
 - Add command-line flags:
