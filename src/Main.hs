@@ -3,26 +3,28 @@
 module Main ( main ) where
 
 import qualified Network.MPD as MPD
-import Network.MPD
-       ( Metadata(..), PlaybackState(Stopped, Playing, Paused) )
+import Network.MPD ( PlaybackState(Stopped, Playing, Paused) )
+
+import Network.MPD.Parse
+    ( getAllTags,
+      getStatusField,
+      getStatusFieldElement,
+      getStatusIdInt,
+      maybePathCurrentSong,
+      maybePathNextPlaylistSong,
+      SongCurrentOrNext(..) )
+import Network.MPD.JSON ( objectMaybes, jsonSongTags, (.=?) )
+import Options
+       ( optsParserInfo, execParser, Opts(..), NextSongFlag(..) )
+
 import Data.Aeson ( object, KeyValue((.=)) )
 import Data.Aeson.Encode.Pretty
-       ( defConfig, encodePretty', keyOrder, Config(confCompare) )
+       ( defConfig, encodePretty', keyOrder, Config(..), Indent(..) )
 import qualified Data.ByteString.Lazy.Char8 as C
 import Text.Printf ( printf )
-import Options
-    ( optsParserInfo, execParser, Opts(optPass, optHost, optPort) )
-
-import Network.MPD.Parse ( getStatusField
-                         , getStatusFieldElement
-                         , getTag
-                         , maybePathCurrentSong
-                         , maybePathNextPlaylistSong
-                         , (.=?)
-                         , objectJson
-                         , getStatusIdInt )
 
 import Text.Read (readMaybe)
+import Data.Maybe (fromMaybe)
 {- | Where the program connects to MPD and uses the helper functions to
 extract values, organize them into a list of key/value pairs, make
 them a 'Data.Aeson.Value' using 'Data.Aeson.object', then encode it to
@@ -34,52 +36,26 @@ main = do
   opts <- execParser optsParserInfo
 
   let withMpdOpts = MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts)
-  cs <- withMpdOpts MPD.currentSong
+  currentSong <- withMpdOpts MPD.currentSong
   st <- withMpdOpts MPD.status
 
-  let artist                     = getTag Artist                     cs
-      artistSort                 = getTag ArtistSort                 cs
-      album                      = getTag Album                      cs
-      albumSort                  = getTag AlbumSort                  cs
-      albumArtist                = getTag AlbumArtist                cs
-      albumArtistSort            = getTag AlbumArtistSort            cs
-      title                      = getTag Title                      cs
-      track                      = getTag Track                      cs
-      name                       = getTag Name                       cs
-      genre                      = getTag Genre                      cs
-      date                       = getTag Date                       cs
-      originalDate               = getTag OriginalDate               cs
-      composer                   = getTag Composer                   cs
-      performer                  = getTag Performer                  cs
-      conductor                  = getTag Conductor                  cs
-      work                       = getTag Work                       cs
-      grouping                   = getTag Grouping                   cs
-      comment                    = getTag Comment                    cs
-      disc                       = getTag Disc                       cs
-      label                      = getTag Label                      cs
-      musicbrainz_Artistid       = getTag MUSICBRAINZ_ARTISTID       cs
-      musicbrainz_Albumid        = getTag MUSICBRAINZ_ALBUMID        cs
-      musicbrainz_Albumartistid  = getTag MUSICBRAINZ_ALBUMARTISTID  cs
-      musicbrainz_Trackid        = getTag MUSICBRAINZ_TRACKID        cs
-      musicbrainz_Releasetrackid = getTag MUSICBRAINZ_RELEASETRACKID cs
-      musicbrainz_Workid         = getTag MUSICBRAINZ_WORKID         cs
-
   let state :: Maybe String
-      state = case getStatusField st MPD.stState of
-                Just ps -> case ps of
-                             Playing -> Just "playing"
-                             Paused  -> Just "paused"
-                             Stopped -> Just "stopped"
-                Nothing -> Nothing
+      state = playbackStateToString <$> getStatusField st MPD.stState
+        where
+          playbackStateToString Playing = "playing"
+          playbackStateToString Paused  = "paused"
+          playbackStateToString Stopped = "stopped"
 
       time = getStatusFieldElement st MPD.stTime
       elapsed = fst <$> time
       duration = snd <$> time
 
       elapsedPercent :: Maybe Double
-      elapsedPercent = case time of
-        Just t1 -> readMaybe $ printf "%.2f" (uncurry (/) t1 * 100)
-        Nothing -> Just 0.0
+      elapsedPercent = readMaybe percentTwoDecimals
+        where
+          percentTwoDecimals = printf "%.2f" timeToPercent
+          timeToPercent = uncurry (/) t * 100
+          t = fromMaybe (0,0) time
 
       volumeSt :: Maybe Int
       volumeSt = fromIntegral <$> getStatusFieldElement st MPD.stVolume
@@ -92,11 +68,8 @@ main = do
       audioFormat    = getStatusField st MPD.stAudio
       errorSt        = getStatusField st MPD.stError
 
-      updatingDbSt   = isJust updatingDbMaybe
-        where
-          updatingDbMaybe = getStatusFieldElement st MPD.stUpdatingDb -- "Nothing" or "Just 1"
-          isJust Nothing = Nothing
-          isJust _       = Just True
+      updatingDbSt :: Maybe Bool
+      updatingDbSt   = (== 1) <$> getStatusFieldElement st MPD.stUpdatingDb
 
       crossfadeSt :: Maybe Int
       crossfadeSt = fromIntegral <$> getStatusField st MPD.stXFadeWidth
@@ -111,42 +84,16 @@ main = do
       nextId         = getStatusIdInt MPD.stNextSongID st
       playlistLength = getStatusField st MPD.stPlaylistLength
 
-  nextPlaylistSong <- withMpdOpts $ MPD.playlistInfo nextPos
-  let filename = maybePathCurrentSong cs
-      filenameNext = maybePathNextPlaylistSong nextPlaylistSong
+  nextSong <- withMpdOpts $ MPD.playlistInfo nextPos
+  let filename = maybePathCurrentSong currentSong
+      filenameNext = maybePathNextPlaylistSong nextSong
 
   -- sgTags
-  let jTags = objectJson
-        [ "artist"                     .=? artist
-        , "artist_sort"                .=? artistSort
-        , "album"                      .=? album
-        , "album_sort"                 .=? albumSort
-        , "album_artist"               .=? albumArtist
-        , "album_artist_sort"          .=? albumArtistSort
-        , "title"                      .=? title
-        , "track"                      .=? track
-        , "name"                       .=? name
-        , "genre"                      .=? genre
-        , "date"                       .=? date
-        , "original_date"              .=? originalDate
-        , "composer"                   .=? composer
-        , "performer"                  .=? performer
-        , "conductor"                  .=? conductor
-        , "work"                       .=? work
-        , "grouping"                   .=? grouping
-        , "comment"                    .=? comment
-        , "disc"                       .=? disc
-        , "label"                      .=? label
-        , "musicbrainz_artistid"       .=? musicbrainz_Artistid
-        , "musicbrainz_albumid"        .=? musicbrainz_Albumid
-        , "musicbrainz_albumartistid"  .=? musicbrainz_Albumartistid
-        , "musicbrainz_trackid"        .=? musicbrainz_Trackid
-        , "musicbrainz_releasetrackid" .=? musicbrainz_Releasetrackid
-        , "musicbrainz_workid"         .=? musicbrainz_Workid
-        ]
+  let jsonCurrentSongTags = jsonSongTags $ getAllTags $ Current currentSong
+      jsonNextSongTags = jsonSongTags $ getAllTags $ Next nextSong
 
   -- status
-  let jStatus = objectJson
+  let jsonStatus = objectMaybes
         [ "state"           .=? state
         , "repeat"          .=? repeatSt
         , "random"          .=? randomSt
@@ -165,50 +112,65 @@ main = do
         , "error"           .=? errorSt
         ]
 
-  -- let jFilename = objectJson [ "file" .=? filename ]
+  -- let jFilename = objectMaybes [ "file" .=? filename ]
 
-  let jPlaylist = objectJson
-        [ "position"      .=? pos  -- current song position
+  let jsonPlaylist = objectMaybes
+        [ "position"      .=? pos
         , "next_position" .=? nextPos
-        , "id"            .=? songId  -- current song id
+        , "id"            .=? songId
         , "next_id"       .=? nextId
         , "length"        .=? playlistLength
         ]
 
-  let jObject = object [ "filename"      .= filename
-                       , "next_filename" .= filenameNext
-                       , "playlist"      .= jPlaylist
-                       , "status"        .= jStatus
-                       , "tags"          .= jTags
-                       ]
+  let jsonBaseObject tags = object
+                $ [ "filename"      .= filename
+                  , "next_filename" .= filenameNext
+                  , "playlist"      .= jsonPlaylist
+                  , "status"        .= jsonStatus
+                  ] ++ tags
 
-  C.putStrLn $ encodePretty' customEncodeConf jObject
+  let printJson tags = C.putStrLn
+                       $ encodePretty' customEncodeConf
+                       $ jsonBaseObject tags
+
+  case optNext opts of
+    NoNextSong -> printJson [ "tags" .= jsonCurrentSongTags ]
+
+    OnlyNextSong -> printJson [ "tags" .= jsonNextSongTags ]
+    IncludeNextSong -> printJson [ "tags" .= jsonCurrentSongTags
+                                 , "next" .= object [ "tags" .= jsonNextSongTags ] ]
 
 customEncodeConf :: Config
 customEncodeConf = defConfig
-  { confCompare = keyOrder [ "title", "name"
-                           , "artist", "album_artist", "artist_sort", "album_artist_sort"
-                           , "album", "album_sort"
-                           , "track", "disc"
-                           , "date", "original_date"
-                           , "genre", "composer", "performer", "conductor"
-                           , "work", "grouping", "label"
-                           , "comment"
-                           , "musicbrainz_artistid"
-                           , "musicbrainz_albumid"
-                           , "musicbrainz_albumartistid"
-                           , "musicbrainz_trackid"
-                           , "musicbrainz_releasetrackid"
-                           , "musicbrainz_workid"
-                           -- status
-                           , "state", "repeat", "random", "single", "consume"
-                           , "duration", "elapsed", "elapsed_percent"
-                           , "volume", "audio_format", "bitrate"
-                           , "crossfade", "mixramp_db", "mixramp_delay"
-                           , "updating_db"
-                           , "error"
-                           -- playlist
-                           , "position", "next_position", "id", "next_id"
-                           , "length"
-                           ]
-  }
+ { confCompare =
+     keyOrder
+     -- top level labels
+     [ "filename", "next_filename", "status", "playlist", "tags", "next"
+     -- tags
+     , "title", "name"
+     , "artist", "album_artist", "artist_sort", "album_artist_sort"
+     , "album", "album_sort"
+     , "track", "disc"
+     , "date", "original_date"
+     , "genre", "composer", "performer", "conductor"
+     , "work", "grouping", "label"
+     , "comment"
+     , "musicbrainz_artistid"
+     , "musicbrainz_albumid"
+     , "musicbrainz_albumartistid"
+     , "musicbrainz_trackid"
+     , "musicbrainz_releasetrackid"
+     , "musicbrainz_workid"
+     -- status
+     , "state", "repeat", "random", "single", "consume"
+     , "duration", "elapsed", "elapsed_percent"
+     , "volume", "audio_format", "bitrate"
+     , "crossfade", "mixramp_db", "mixramp_delay"
+     , "updating_db"
+     , "error"
+     -- playlist
+     , "id", "next_id", "position", "next_position"
+     , "length"
+     ]
+ , confIndent = Spaces 2
+ }

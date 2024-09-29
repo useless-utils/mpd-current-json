@@ -1,3 +1,17 @@
+# v2.0
+- Major code rewrite.
+- Add command-line flags:
+  - `-n`: is an alias for `--next`
+  - `-nn`: is an alias for `--next-only`
+  - `--next`: Include information about the next queued song in the
+    output JSON.
+  - `--next-only`: Print only the next queued song's information,
+    replacing the `tags` object.
+- Add support for multi-value tags such as multiple artists. If a tag
+  contains multiple values it should be displayed as an array in the
+  output json.
+- Major performance increase.
+
 # v1.5.0.1
 - Fix `next_filename` to display correct filename URI.
   - It was using Id instead of Position. Position is a 0-indexed

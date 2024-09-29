@@ -22,26 +22,28 @@ Import for the ~libmpd~ library, added as ~libmpd == 0.10.*~ to
 [[#orgid-tkwglz][mpd-current-json.cabal]].
 #+begin_src haskell
 import qualified Network.MPD as MPD
-import Network.MPD
-       ( Metadata(..), PlaybackState(Stopped, Playing, Paused) )
+import Network.MPD ( PlaybackState(Stopped, Playing, Paused) )
+
+import Network.MPD.Parse
+    ( getAllTags,
+      getStatusField,
+      getStatusFieldElement,
+      getStatusIdInt,
+      maybePathCurrentSong,
+      maybePathNextPlaylistSong,
+      SongCurrentOrNext(..) )
+import Network.MPD.JSON ( objectMaybes, jsonSongTags, (.=?) )
+import Options
+       ( optsParserInfo, execParser, Opts(..), NextSongFlag(..) )
+
 import Data.Aeson ( object, KeyValue((.=)) )
 import Data.Aeson.Encode.Pretty
-       ( defConfig, encodePretty', keyOrder, Config(confCompare) )
+       ( defConfig, encodePretty', keyOrder, Config(..), Indent(..) )
 import qualified Data.ByteString.Lazy.Char8 as C
 import Text.Printf ( printf )
-import Options
-    ( optsParserInfo, execParser, Opts(optPass, optHost, optPort) )
-
-import Network.MPD.Parse ( getStatusField
-                         , getStatusFieldElement
-                         , getTag
-                         , maybePathCurrentSong
-                         , maybePathNextPlaylistSong
-                         , (.=?)
-                         , objectJson
-                         , getStatusIdInt )
 
 import Text.Read (readMaybe)
+import Data.Maybe (fromMaybe)
 #+end_src
 
 **** Main
@@ -62,71 +64,37 @@ Parse the command-line options and bind the result to =opts=.
 #+end_src
 
 Connect to MPD using either the provided arguments from the
-command-line or the default values, as defined in [[#orgid-pkjqgp][~Parser Opts~ definition]].
+command-line or the default values, as defined in [[#orgid-pkjqgp][Parser Opts definition]].
 #+begin_src haskell
   let withMpdOpts = MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts)
-  cs <- withMpdOpts MPD.currentSong
+  currentSong <- withMpdOpts MPD.currentSong
   st <- withMpdOpts MPD.status
 #+end_src
-where =currentSong= returns a =Either (Maybe (Song {...}))= and =status=
-returns =Either (Status {...})= to be parsed.
-- See =base= Prelude's documentation for [[https://hackage.haskell.org/package/base/docs/Prelude.html#t:Either][Either]] and [[https://hackage.haskell.org/package/base/docs/Prelude.html#t:Maybe][Maybe]].
+# where =currentSong= returns a =Either (Maybe (Song {...}))= and =status=
+# returns =Either (Status {...})= to be parsed.
+# - See =base= Prelude's documentation for [[https://hackage.haskell.org/package/base/docs/Prelude.html#t:Either][Either]] and [[https://hackage.haskell.org/package/base/docs/Prelude.html#t:Maybe][Maybe]].
 
-The data record =Song= from the command =currentSong= contains a field
-label "=sgTags=" that contains all embedded metadata tags in a
-=fromList [...]=, in this =let= statement store the parser =getTag= function
-calls to be placed in the JSON object later:
-#+begin_src haskell
-  let artist                     = getTag Artist                     cs
-      artistSort                 = getTag ArtistSort                 cs
-      album                      = getTag Album                      cs
-      albumSort                  = getTag AlbumSort                  cs
-      albumArtist                = getTag AlbumArtist                cs
-      albumArtistSort            = getTag AlbumArtistSort            cs
-      title                      = getTag Title                      cs
-      track                      = getTag Track                      cs
-      name                       = getTag Name                       cs
-      genre                      = getTag Genre                      cs
-      date                       = getTag Date                       cs
-      originalDate               = getTag OriginalDate               cs
-      composer                   = getTag Composer                   cs
-      performer                  = getTag Performer                  cs
-      conductor                  = getTag Conductor                  cs
-      work                       = getTag Work                       cs
-      grouping                   = getTag Grouping                   cs
-      comment                    = getTag Comment                    cs
-      disc                       = getTag Disc                       cs
-      label                      = getTag Label                      cs
-      musicbrainz_Artistid       = getTag MUSICBRAINZ_ARTISTID       cs
-      musicbrainz_Albumid        = getTag MUSICBRAINZ_ALBUMID        cs
-      musicbrainz_Albumartistid  = getTag MUSICBRAINZ_ALBUMARTISTID  cs
-      musicbrainz_Trackid        = getTag MUSICBRAINZ_TRACKID        cs
-      musicbrainz_Releasetrackid = getTag MUSICBRAINZ_RELEASETRACKID cs
-      musicbrainz_Workid         = getTag MUSICBRAINZ_WORKID         cs
-#+end_src
-- See the protocol documentation for Tags:
-  + [[https://mpd.readthedocs.io/en/stable/protocol.html#tags][Protocol — Music Player Daemon documentation#Tags]]
-
-Likewise, =getStatusItem= parses values from =Status {...}= returned by
-=status=, some may require additional =Maybe= checks to get the desired
-values.
+# Likewise, =getStatusItem= parses values from =Status {...}= returned by
+# =status=, some may require additional =Maybe= checks to get the desired
+# values.
 #+begin_src haskell
   let state :: Maybe String
-      state = case getStatusField st MPD.stState of
-                Just ps -> case ps of
-                             Playing -> Just "playing"
-                             Paused  -> Just "paused"
-                             Stopped -> Just "stopped"
-                Nothing -> Nothing
+      state = playbackStateToString <$> getStatusField st MPD.stState
+        where
+          playbackStateToString Playing = "playing"
+          playbackStateToString Paused  = "paused"
+          playbackStateToString Stopped = "stopped"
 
       time = getStatusFieldElement st MPD.stTime
       elapsed = fst <$> time
       duration = snd <$> time
 
       elapsedPercent :: Maybe Double
-      elapsedPercent = case time of
-        Just t1 -> readMaybe $ printf "%.2f" (uncurry (/) t1 * 100)
-        Nothing -> Just 0.0
+      elapsedPercent = readMaybe percentTwoDecimals
+        where
+          percentTwoDecimals = printf "%.2f" timeToPercent
+          timeToPercent = uncurry (/) t * 100
+          t = fromMaybe (0,0) time
 
       volumeSt :: Maybe Int
       volumeSt = fromIntegral <$> getStatusFieldElement st MPD.stVolume
@@ -139,11 +107,8 @@ values.
       audioFormat    = getStatusField st MPD.stAudio
       errorSt        = getStatusField st MPD.stError
 
-      updatingDbSt   = isJust updatingDbMaybe
-        where
-          updatingDbMaybe = getStatusFieldElement st MPD.stUpdatingDb -- "Nothing" or "Just 1"
-          isJust Nothing = Nothing
-          isJust _       = Just True
+      updatingDbSt :: Maybe Bool
+      updatingDbSt   = (== 1) <$> getStatusFieldElement st MPD.stUpdatingDb
 
       crossfadeSt :: Maybe Int
       crossfadeSt = fromIntegral <$> getStatusField st MPD.stXFadeWidth
@@ -158,9 +123,9 @@ values.
       nextId         = getStatusIdInt MPD.stNextSongID st
       playlistLength = getStatusField st MPD.stPlaylistLength
 
-  nextPlaylistSong <- withMpdOpts $ MPD.playlistInfo nextPos
-  let filename = maybePathCurrentSong cs
-      filenameNext = maybePathNextPlaylistSong nextPlaylistSong
+  nextSong <- withMpdOpts $ MPD.playlistInfo nextPos
+  let filename = maybePathCurrentSong currentSong
+      filenameNext = maybePathNextPlaylistSong nextSong
 #+end_src
 
 # Create the first JSON object that contains all the extracted =sgTags=
@@ -170,48 +135,13 @@ values.
 # "=Nothing=", if so, also send =Nothing= as the value of the key/value
 # pair, then, in conjunction with =catMaybes= filter out empty values and
 # extract only the values from =Just=, returning the raw value.
-
-The =object . catMaybes= constructs a JSON object by combining a list of
-key/value pairs. The ~.=?~ operator is used to create each key/value
-pair. If the value is =Just=, the key/value pair is included in the
-list; if the value is =Nothing=, it is filtered out using =catMaybes= to
-prevent generating fields with a value of =null= in the final JSON
-object. Then, the =object= function converts the list of key/value
-pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
-=Data.Aeson='s "=encode=" or =Data.Aeson.Encode.Pretty='s "=encodePretty=".
 #+begin_src haskell
   -- sgTags
-  let jTags = objectJson
-        [ "artist"                     .=? artist
-        , "artist_sort"                .=? artistSort
-        , "album"                      .=? album
-        , "album_sort"                 .=? albumSort
-        , "album_artist"               .=? albumArtist
-        , "album_artist_sort"          .=? albumArtistSort
-        , "title"                      .=? title
-        , "track"                      .=? track
-        , "name"                       .=? name
-        , "genre"                      .=? genre
-        , "date"                       .=? date
-        , "original_date"              .=? originalDate
-        , "composer"                   .=? composer
-        , "performer"                  .=? performer
-        , "conductor"                  .=? conductor
-        , "work"                       .=? work
-        , "grouping"                   .=? grouping
-        , "comment"                    .=? comment
-        , "disc"                       .=? disc
-        , "label"                      .=? label
-        , "musicbrainz_artistid"       .=? musicbrainz_Artistid
-        , "musicbrainz_albumid"        .=? musicbrainz_Albumid
-        , "musicbrainz_albumartistid"  .=? musicbrainz_Albumartistid
-        , "musicbrainz_trackid"        .=? musicbrainz_Trackid
-        , "musicbrainz_releasetrackid" .=? musicbrainz_Releasetrackid
-        , "musicbrainz_workid"         .=? musicbrainz_Workid
-        ]
+  let jsonCurrentSongTags = jsonSongTags $ getAllTags $ Current currentSong
+      jsonNextSongTags = jsonSongTags $ getAllTags $ Next nextSong
 
   -- status
-  let jStatus = objectJson
+  let jsonStatus = objectMaybes
         [ "state"           .=? state
         , "repeat"          .=? repeatSt
         , "random"          .=? randomSt
@@ -230,70 +160,100 @@ pairs =[Pair]= into a =Value= data structure that can be 'encoded' using
         , "error"           .=? errorSt
         ]
 
-  -- let jFilename = objectJson [ "file" .=? filename ]
+  -- let jFilename = objectMaybes [ "file" .=? filename ]
 
-  let jPlaylist = objectJson
-        [ "position"      .=? pos  -- current song position
+  let jsonPlaylist = objectMaybes
+        [ "position"      .=? pos
         , "next_position" .=? nextPos
-        , "id"            .=? songId  -- current song id
+        , "id"            .=? songId
         , "next_id"       .=? nextId
         , "length"        .=? playlistLength
         ]
 #+end_src
 
-Having two objects, one for "tags" and other for "status", create a
-nested JSON with labels before each of them.
+Create nested JSON objects with labels before each of them.
 #+begin_src haskell
-  let jObject = object [ "filename"      .= filename
-                       , "next_filename" .= filenameNext
-                       , "playlist"      .= jPlaylist
-                       , "status"        .= jStatus
-                       , "tags"          .= jTags
-                       ]
+  let jsonBaseObject tags = object
+                $ [ "filename"      .= filename
+                  , "next_filename" .= filenameNext
+                  , "playlist"      .= jsonPlaylist
+                  , "status"        .= jsonStatus
+                  ] ++ tags
 #+end_src
 e.g. so they can be parsed as "=.tags.title=" or
 "=.status.elapsed_percent=".
 
-Finally, encode it to real JSON and print it to the
-terminal. =Data.Aeson='s encoding is returned as a =ByteString= so use the
-=Data.ByteString...= import that provides an implementation of =putStrLn=
-that supports =ByteString=​s.
+Helper for printing the encoded JSON
 #+begin_src haskell
-  C.putStrLn $ encodePretty' customEncodeConf jObject
+  let printJson tags = C.putStrLn
+                       $ encodePretty' customEncodeConf
+                       $ jsonBaseObject tags
 #+end_src
 where ~customEncodeConf~ is an override for the
 ~Data.Aeson.Encode.Pretty~'s [[https://hackage.haskell.org/package/aeson-pretty-0.8.10/docs/Data-Aeson-Encode-Pretty.html#t:Config][Config]] data record. +This is really
 unnecessary but+ using [[https://hackage.haskell.org/package/aeson-pretty/docs/Data-Aeson-Encode-Pretty.html#v:keyOrder][keyOrder]] it is possible to customize the order
 the encoded JSON bytestring will be displayed as.
+
+# Finally, encode it to real JSON and print it to the
+# terminal. =Data.Aeson='s encoding is returned as a =ByteString= so use the
+# =Data.ByteString...= import that provides an implementation of =putStrLn=
+# that supports =ByteString=​s.
+
+By default print the encoded JSON object containing =jsonBaseObject= + a
+="tags"= object for tags about the current song.
+- With no =--next=, =--next-only=, =-n= or =-nn= command-line flag provided,
+  assign =NoNextSong= to [[#orgid-yiypwm][optNext in Opts]].
+- If the =--next= flag is provided to the program, assigning
+  =IncludeNextSong= to [[#orgid-yiypwm][optNext in Opts]], /include/ in its output JSON
+  information about the next song in the playlist.
+- If the =--next= flag is provided twice either using it's shorthand
+  e.g. =-nn= or even =--next --next=, assigning =OnlyNextSong= to
+  [[#orgid-yiypwm][optNext in Opts]] /replace/ the ="tags"= object with
+  information about the next song instead.
+#+begin_src haskell
+  case optNext opts of
+    NoNextSong -> printJson [ "tags" .= jsonCurrentSongTags ]
+
+    OnlyNextSong -> printJson [ "tags" .= jsonNextSongTags ]
+    IncludeNextSong -> printJson [ "tags" .= jsonCurrentSongTags
+                                 , "next" .= object [ "tags" .= jsonNextSongTags ] ]
+#+end_src
+
 #+begin_src haskell
 customEncodeConf :: Config
 customEncodeConf = defConfig
-  { confCompare = keyOrder [ "title", "name"
-                           , "artist", "album_artist", "artist_sort", "album_artist_sort"
-                           , "album", "album_sort"
-                           , "track", "disc"
-                           , "date", "original_date"
-                           , "genre", "composer", "performer", "conductor"
-                           , "work", "grouping", "label"
-                           , "comment"
-                           , "musicbrainz_artistid"
-                           , "musicbrainz_albumid"
-                           , "musicbrainz_albumartistid"
-                           , "musicbrainz_trackid"
-                           , "musicbrainz_releasetrackid"
-                           , "musicbrainz_workid"
-                           -- status
-                           , "state", "repeat", "random", "single", "consume"
-                           , "duration", "elapsed", "elapsed_percent"
-                           , "volume", "audio_format", "bitrate"
-                           , "crossfade", "mixramp_db", "mixramp_delay"
-                           , "updating_db"
-                           , "error"
-                           -- playlist
-                           , "position", "next_position", "id", "next_id"
-                           , "length"
-                           ]
-  }
+ { confCompare =
+     keyOrder
+     -- top level labels
+     [ "filename", "next_filename", "status", "playlist", "tags", "next"
+     -- tags
+     , "title", "name"
+     , "artist", "album_artist", "artist_sort", "album_artist_sort"
+     , "album", "album_sort"
+     , "track", "disc"
+     , "date", "original_date"
+     , "genre", "composer", "performer", "conductor"
+     , "work", "grouping", "label"
+     , "comment"
+     , "musicbrainz_artistid"
+     , "musicbrainz_albumid"
+     , "musicbrainz_albumartistid"
+     , "musicbrainz_trackid"
+     , "musicbrainz_releasetrackid"
+     , "musicbrainz_workid"
+     -- status
+     , "state", "repeat", "random", "single", "consume"
+     , "duration", "elapsed", "elapsed_percent"
+     , "volume", "audio_format", "bitrate"
+     , "crossfade", "mixramp_db", "mixramp_delay"
+     , "updating_db"
+     , "error"
+     -- playlist
+     , "id", "next_id", "position", "next_position"
+     , "length"
+     ]
+ , confIndent = Spaces 2
+ }
 #+end_src
 
 *** Options.hs
@@ -303,6 +263,7 @@ customEncodeConf = defConfig
 #+begin_src haskell
 module Options
   ( Opts(..)
+  , NextSongFlag(..)
   , execParser
   , prefs
   , showHelpOnEmpty
@@ -320,6 +281,7 @@ import Options.Applicative
       metavar,
       option,
       strOption,
+      flag',
       prefs,
       progDesc,
       short,
@@ -329,13 +291,14 @@ import Options.Applicative
       Parser,
       ParserInfo,
       infoOption,
-      hidden )
+      hidden,
+      many,
+      (<|>) )
 
 import Options.Applicative.Extra ( helperWith )
 
 import Version ( versionStr, progName )
 import Data.Kind (Type)
-
 #+end_src
 
 **** Data record for holding parsed 'Parser' values
@@ -347,8 +310,13 @@ data Opts = Opts  -- ^ Custom data record for storing 'Options.Applicative.Parse
   { optPort    :: Integer  -- ^ MPD port to connect.
   , optHost    :: String   -- ^ MPD host address to connect.
   , optPass    :: String   -- ^ Plain text password to connect to MPD.
+  , optNext    :: NextSongFlag -- ^ Either include in the json or print it alone.
   , optVersion :: Type -> Type  -- ^ Print program version.
   }
+
+data NextSongFlag = IncludeNextSong
+                  | OnlyNextSong
+                  | NoNextSong
 #+end_src
 
 **** ~Parser Opts~ definition
@@ -368,7 +336,11 @@ optsParser
   <$> portOptParser
   <*> hostOptParser
   <*> passOptParser
+  <*> nextSongOptParser
   <*> versionOptParse
+  where
+    nextSongOptParser = nextSongFlagCountOptParser
+                        <|> nextSongOnlyOptParser
 
 portOptParser :: Parser Integer
 portOptParser
@@ -396,6 +368,28 @@ passOptParser
   <> short 'P'
   <> value ""
   <> help "Password for connecting (will be sent as plain text)"
+
+nextSongFlagCountOptParser :: Parser NextSongFlag
+nextSongFlagCountOptParser =
+  fmap (intToNextSong . length) <$> many
+  $ flag' ()
+  $ short 'n'
+  <> long "next"
+  <> help ( concat
+            [ "If used once (e.g. -n), include next song information in the output.\n"
+            , "If used twice (e.g. -nn) it's an alias for --next-only." ])
+
+nextSongOnlyOptParser :: Parser NextSongFlag
+nextSongOnlyOptParser
+  = flag' OnlyNextSong
+    ( long "next-only"
+      <> help "Only print next song information." )
+
+intToNextSong :: Int -> NextSongFlag
+intToNextSong count
+  | count == 1 = IncludeNextSong
+  | count > 1 = OnlyNextSong
+  | otherwise = NoNextSong
 
 versionOptParse :: Parser (a -> a)
 versionOptParse =
@@ -487,37 +481,138 @@ main = defaultMain
 :header-args:haskell+: :tangle lib/Network/MPD/Parse.hs
 :END:
 
+Parsing functions module for libmpd retrieved data.
 #+begin_src haskell
 module Network.MPD.Parse
-  ( getStatusField
+  ( TagField (..)
+  , ExtractedTags (..)
+  , getAllTags
+  , getStatusField
   , getStatusFieldElement
+  , SongCurrentOrNext(..)
   , getTag
-  , processSong
+  , songToTagField
   , maybePathCurrentSong
   , maybePathNextPlaylistSong
-  , headMay
-  , valueToStringMay
-  , (.=?)
-  , objectJson
+  , singleValueToString
+  , multiValueToString
   , getStatusIdInt
-  ) where
+  )
+where
 
 import qualified Network.MPD as MPD
 import Network.MPD
        ( Metadata(..), Song, PlaybackState(Stopped, Playing, Paused) )
-import Data.Aeson ( object, Key, KeyValue(..), ToJSON, Value )
-import Data.Aeson.Types ( Pair )
-import Data.Maybe ( catMaybes, fromMaybe )
+import Data.Maybe ( fromMaybe )
+import Data.List ( (!?) )
+#+end_src
+
+Define a data record for storing parsed tags as =Maybe String= or =Maybe
+[String]=, this works because even though =String= and =[String]= are
+different, [[https://hackage.haskell.org/package/aeson/docs/Data-Aeson.html#t:Value][Data.Aeson.Value]] support various different types for
+encoding them into the different JSON types. At first =TagField= was
+just an alias for =Maybe String= but later adding support for
+multi-value tags, to be able to store /either/ of them in them same data
+record field custom type representing both was very useful.
+
+This approach greatly improved performance when comparing to doing
+everything in a =IO= block.
+#+begin_src haskell
+{- | Wrapper for the output of 'getTag', which internally uses
+'Network.MPD.sgGetTag' to retrieve @Maybe@ ['Network.MPD.Value'] that
+are then converted to @TagField@. This allows handling multi-value
+tags like multiple artists.
+-}
+data TagField = SingleTagField !(Maybe String)
+              | MultiTagField !(Maybe [String])
+  deriving (Show, Eq)
+
+{- | Store the parsed output of 'getTag'.
+
+Each field represents a supported MPD tag.
+-}
+data ExtractedTags = ExtractedTags
+  { artist                     :: !TagField
+  , artistSort                 :: !TagField
+  , album                      :: !TagField
+  , albumSort                  :: !TagField
+  , albumArtist                :: !TagField
+  , albumArtistSort            :: !TagField
+  , title                      :: !TagField
+  , track                      :: !TagField
+  , name                       :: !TagField
+  , genre                      :: !TagField
+  , date                       :: !TagField
+  , originalDate               :: !TagField
+  , composer                   :: !TagField
+  , performer                  :: !TagField
+  , conductor                  :: !TagField
+  , work                       :: !TagField
+  , grouping                   :: !TagField
+  , comment                    :: !TagField
+  , disc                       :: !TagField
+  , label                      :: !TagField
+  , musicbrainz_ArtistId       :: !TagField
+  , musicbrainz_AlbumId        :: !TagField
+  , musicbrainz_AlbumartistId  :: !TagField
+  , musicbrainz_TrackId        :: !TagField
+  , musicbrainz_ReleasetrackId :: !TagField
+  , musicbrainz_WorkId         :: !TagField
+  }
+#+end_src
+
+The data record =Song= from the command =currentSong= contains a field
+label "=sgTags=" that contains all MPD supported embedded metadata tags
+in a =fromList [...]=, this helper stores the output from the parser
+=getTag= function calls in the custom data record =ExtractedTags=.
+- See the protocol documentation for Tags:
+  + [[https://mpd.readthedocs.io/en/stable/protocol.html#tags][Protocol — Music Player Daemon documentation#Tags]]
+#+begin_src haskell
+{- | Assign 'getTag' returned values to 'ExtractedTags'.
+
+Takes either a song @Current s@ or @Next s@, because their object
+format differs, see 'SongCurrentOrNext'.
+-}
+getAllTags :: SongCurrentOrNext -> ExtractedTags
+getAllTags s = ExtractedTags
+  { artist                     = f Artist                     s
+  , artistSort                 = f ArtistSort                 s
+  , album                      = f Album                      s
+  , albumSort                  = f AlbumSort                  s
+  , albumArtist                = f AlbumArtist                s
+  , albumArtistSort            = f AlbumArtistSort            s
+  , title                      = f Title                      s
+  , track                      = f Track                      s
+  , name                       = f Name                       s
+  , genre                      = f Genre                      s
+  , date                       = f Date                       s
+  , originalDate               = f OriginalDate               s
+  , composer                   = f Composer                   s
+  , performer                  = f Performer                  s
+  , conductor                  = f Conductor                  s
+  , work                       = f Work                       s
+  , grouping                   = f Grouping                   s
+  , comment                    = f Comment                    s
+  , disc                       = f Disc                       s
+  , label                      = f Label                      s
+  , musicbrainz_ArtistId       = f MUSICBRAINZ_ARTISTID       s
+  , musicbrainz_AlbumId        = f MUSICBRAINZ_ALBUMID        s
+  , musicbrainz_AlbumartistId  = f MUSICBRAINZ_ALBUMARTISTID  s
+  , musicbrainz_TrackId        = f MUSICBRAINZ_TRACKID        s
+  , musicbrainz_ReleasetrackId = f MUSICBRAINZ_RELEASETRACKID s
+  , musicbrainz_WorkId         = f MUSICBRAINZ_WORKID         s
+  }
+  where
+    f = getTag
 #+end_src
 
 #+begin_src haskell
-{- | Extract a field from the returned MPD.Status data record.
+{- | Extract a field from the returned 'Network.MPD.Status' data record.
 
-Helper to extract a specific field from the
-[Network.MPD.Status](Network.MPD#Status) data record by providing the
-corresponding field label. If the input status "@st@" is /not/ @Right a@,
-indicating an error, or the field label function is not applicable, it
-returns @Nothing@.
+Helper to extract a specific field from the 'Network.MPD.Status' data
+record by providing the corresponding field label. If the input status
+"@st@" is /not/ @Right a@, indicating an error, or the field label
+function is not applicable, it returns @Nothing@.
 
 ==== __Example__:
 
@@ -550,46 +645,80 @@ getStatusFieldElement :: MPD.Response MPD.Status -> (MPD.Status -> Maybe a) -> M
 getStatusFieldElement status item = fromMaybe Nothing $ getStatusField status item
 #+end_src
 
-
-The =getTag= function takes a metadata type =t= and an =Either= value
-=c= containing a =Maybe Song=. It checks if the =Either= value is
-=Left _=, indicating an error, and returns =Nothing=. If the =Either=
-value is =Right song=, it calls the =processSong= function with the
-metadata type =t= and the =Just song= value, which extracts the tag
-value from the song. The =getTag= function helps to retrieve a
-specific tag value from the song if it exists.
+Instead of parsing using function argument definitions, define a data
+type that instances the specific response the parsing functions
+return.
 #+begin_src haskell
-{- | @Either@ check for the returned value of 'Network.MPD.currentSong',
-then call 'processSong' or return @Nothing@.
--}
-getTag :: Metadata -> Either a (Maybe Song) -> Maybe String
-getTag t c =
-  case c of
-    Left _ -> Nothing
-    Right song -> processSong t song
+-- | Alias for the output of 'Network.MPD.currentSong'.
+type CurrentSong = MPD.Response (Maybe Song)
+
+-- | Alias for the output of 'Network.MPD.playlistInfo'.
+type NextSong = MPD.Response [Song]
+
+-- | Wrapper for 'getTag' to expect either @Maybe Song@ or
+-- @[Song]@. This simplifies 'getAllTags'.
+data SongCurrentOrNext = Current !CurrentSong
+                       | Next !NextSong
 #+end_src
 
-The =processSong= function takes a metadata type =tag= and a
-=Maybe Song=. If the =Maybe Song= value is =Nothing=, indicating an
-empty value, it returns =Nothing=. If the =Maybe Song= value is
-=Just song=, it retrieves the tag value using the =MPD.sgGetTag=
-function with the provided metadata type and song. It then applies the
-=headMay= function to extract the first element from the list of tag
-values and the =valueToStringMay= function to convert the value to a
-string within a =Maybe= context. This function helps to process the
-tag values of a song and convert them to strings if they exist.
+
+# The =getTag= function takes a metadata type =t= and an =Either= value
+# =c= containing a =Maybe Song=. It checks if the =Either= value is
+# =Left _=, indicating an error, and returns =Nothing=. If the =Either=
+# value is =Right song=, it calls the =processSong= function with the
+# metadata type =t= and the =Just song= value, which extracts the tag
+# value from the song. The =getTag= function helps to retrieve a
+# specific tag value from the song if it exists.
 #+begin_src haskell
-{- | Use 'Network.MPD.sgGetTag' to extract a @tag@ from a @song@, safely
-get only the head item of the returned @Maybe@ list, then safely
-convert it to a string.
+-- | Retrieve @tag@, which should be one of 'Network.MPD.Metadata', from
+-- 'CurrentSong' or 'NextSong'.
+getTag :: Metadata -> SongCurrentOrNext -> TagField
+getTag tag (Current song) =
+  case song of
+    Left _ -> SingleTagField Nothing
+    Right (Just s) -> songToTagField tag s
+getTag tag (Next song) =
+  case song of
+    Right [s] -> songToTagField tag s
+    Left _    -> SingleTagField Nothing
+    _any      -> SingleTagField Nothing
+
+{- | Extract a @tag@ 'Network.MPD.Value' from 'Network.MPD.Song' using
+'Network.MPD.sgGetTag', convert the output to either @Maybe String@ or
+@Maybe [String]@ and wrap it in 'TagField'.
+
+Because 'Network.MPD.sgGetTag' returns @Maybe@ ['Network.MPD.Value']
+where @Value@ is an instance of @ByteString@ it also offers helper
+conversion functions, so convert it to @String@ if the field only
+contains a list of one value or convert all ['Network.MPD.Value'] list
+items to @String@ and return the list.
 -}
-processSong :: Metadata -> Maybe Song -> Maybe String
-processSong _ Nothing = Nothing
-processSong tag (Just song) = do
-  let tagVal = MPD.sgGetTag tag song
-  valueToStringMay =<< (headMay =<< tagVal)
+songToTagField :: Metadata -> Song -> TagField
+songToTagField tag song = tagSingleOrList (MPD.sgGetTag tag song)
+  where
+    tagSingleOrList :: Maybe [MPD.Value] -> TagField
+    tagSingleOrList val | fmap length val == Just 1 = SingleTagField $ singleValueToString $ (fromMaybe [] val) !? 0
+                        | fmap length val > Just 1 = MultiTagField $ multiValueToString val
+                        | otherwise = SingleTagField Nothing
 #+end_src
 
+#+begin_src haskell
+{- | Convert 'Network.MPD.Value' to @String@ within a @Maybe@ context.
+
+'MPD.sgGetTag' returns a @Maybe [Value]@. [libmpd](Network.MPD) also
+provides 'Network.MPD.toString' that can also, along with @ByteString@
+and @Text@, convert a 'Network.MPD.Value' to a @String@.
+-}
+singleValueToString :: Maybe MPD.Value -> Maybe String
+singleValueToString (Just x) = Just (MPD.toString x)
+singleValueToString Nothing = Nothing
+
+-- | Same as 'singleValueToString' but converts all @Value@s in the
+-- multi-value-tag list to @String@ and returns the list.
+multiValueToString :: Maybe [MPD.Value] -> Maybe [String]
+multiValueToString (Just x) = Just $ map MPD.toString x
+multiValueToString Nothing = Nothing
+#+end_src
 
 #+begin_src haskell
 {- | Get the current 'Network.MPD.Song' relative path with 'Network.MPD.sgFilePath'
@@ -612,44 +741,108 @@ maybePathNextPlaylistSong (Right (_:_:_)) = Nothing
 maybePathNextPlaylistSong (Right [s]) =  Just $ MPD.toString $ MPD.sgFilePath s
 #+end_src
 
-
-The =headMay= function is a utility function that safely gets the head
-of a list. It takes a list as input and returns =Nothing= if the list is
-empty or =Just x= where =x= is the first element of the list.
+Get the ~Int~ from ~MPD.status~'s ~Either (Status {...})~ fields that use
+the ~MPD.Id~ wrapper: ~stSongID~ and ~stNextSongID~. The current song ID is
+also available in the response from ~MPD.currentSong~ as
+~Either (Maybe (Song {sgId}))~.
 #+begin_src haskell
-{- | Safely get the head of a list. Same as [Safe.headMay](Safe#headMay).
--}
-headMay :: [a] -> Maybe a
-headMay []    = Nothing
-headMay (x:_) = Just x
+-- | Extracts the 'Int' value from an 'Network.MPD.Id' within
+-- 'Network.MPD.Status', if present and the 'Either' value is 'Right'.
+getStatusIdInt :: (MPD.Status -> Maybe MPD.Id) -> Either MPD.MPDError MPD.Status -> Maybe Int
+getStatusIdInt item status =
+  case m of
+    Just (MPD.Id int) -> Just int
+    Nothing -> Nothing
+  where
+    m = fromMaybe Nothing $ getStatusField status item
 #+end_src
 
-The =valueToStringMay= function is a utility function that converts a
-=MPD.Value= to a =String= within a =Maybe= context. It takes a
-=MPD.Value= as input and returns =Just (MPD.toString x)= where =x= is
-the input value converted to a string.
+*** Network.MPD.JSON
+:PROPERTIES:
+:header-args:haskell+: :tangle lib/Network/MPD/JSON.hs
+:END:
+
 #+begin_src haskell
-{- | Convert 'Network.MPD.Value' to @String@ within a @Maybe@ context.
+{-# LANGUAGE OverloadedStrings #-}
+module Network.MPD.JSON
+  ( objectMaybes
+  , jsonSongTags
+  , tagFieldToJSON
+  , (.=?)
+  )
+where
 
-This @Value@ is from 'Network.MPD' and is basically the same as a
-@String@ but used internally to store metadata values.
+import Network.MPD.Parse
+    ( ExtractedTags(..), TagField(..) )
+import Data.Aeson
+    ( Value, KeyValue((.=)), ToJSON(toJSON), Key, object )
+import qualified Data.ByteString.Lazy.Char8 as C
+import Data.Aeson.Types ( Pair )
+import Data.Maybe ( catMaybes )
+#+end_src
 
-==== __Example__:
+Filter list of ~[Maybe Pair]~ key/values.
 
-@
-processSong :: Metadata -> Maybe Song -> Maybe String
-processSong _ Nothing = Nothing
-processSong tag (Just song) = do
-  let tagVal = MPD.sgGetTag tag song
-  valueToStringMay =<< (headMay =<< tagVal)
-@
+The =object . catMaybes= constructs a JSON object by combining a list of
+key/value pairs. The ~.=?~ operator is used to create each key/value
+pair. If the value is =Just=, the key/value pair is included in the
+list; if the value is =Nothing=, it is filtered out using =catMaybes= to
+prevent generating fields with a value of =null= in the final JSON
+object. Then, the =object= function converts the list of key/value pairs
+=[Pair]= into a =Value= data structure that can be 'encoded' using
+=Data.Aeson='s "=encode=" or =Data.Aeson.Encode.Pretty='s "=encodePretty=".
+#+begin_src haskell
+{- | Helper function for creating an JSON 'Data.Aeson.object' where
+'Data.Maybe.catMaybes' won't include items from the @[Maybe
+'Data.Aeson.Types.Pair']@ list that return 'Nothing'.
 
-'MPD.sgGetTag' returns a @Maybe [Value]@. [libmpd](Network.MPD) also provides
-'Network.MPD.toString' that can convert, along other types, a
-'Network.MPD.Value' to a @String@.
+Meant for using with the '(.=?)' operator to remove JSON values from
+the output that would contain @null@ otherwise.
 -}
-valueToStringMay :: MPD.Value -> Maybe String
-valueToStringMay x = Just (MPD.toString x)
+objectMaybes :: [Maybe Pair] -> Value
+objectMaybes = object . catMaybes
+#+end_src
+
+#+begin_src haskell
+-- | Create a 'Data.Aeson.Value' that can be encoded into a
+-- @ByteString@ of conventional JSON with 'Data.Aeson.encode'.
+jsonSongTags :: ExtractedTags -> Value
+jsonSongTags song = objectMaybes
+  [ "artist"            .=? tagFieldToJSON (artist          song)
+  , "artist_sort"       .=? tagFieldToJSON (artistSort      song)
+  , "album"             .=? tagFieldToJSON (album           song)
+  , "album_sort"        .=? tagFieldToJSON (albumSort       song)
+  , "album_artist"      .=? tagFieldToJSON (albumArtist     song)
+  , "album_artist_sort" .=? tagFieldToJSON (albumArtistSort song)
+  , "title"             .=? tagFieldToJSON (title           song)
+  , "track"             .=? tagFieldToJSON (track           song)
+  , "name"              .=? tagFieldToJSON (name            song)
+  , "genre"             .=? tagFieldToJSON (genre           song)
+  , "date"              .=? tagFieldToJSON (date            song)
+  , "original_date"     .=? tagFieldToJSON (originalDate    song)
+  , "composer"          .=? tagFieldToJSON (composer        song)
+  , "performer"         .=? tagFieldToJSON (performer       song)
+  , "conductor"         .=? tagFieldToJSON (conductor       song)
+  , "work"              .=? tagFieldToJSON (work            song)
+  , "grouping"          .=? tagFieldToJSON (grouping        song)
+  , "comment"           .=? tagFieldToJSON (comment         song)
+  , "disc"              .=? tagFieldToJSON (disc            song)
+  , "label"             .=? tagFieldToJSON (label           song)
+  , "musicbrainz_artistid"       .=? tagFieldToJSON (musicbrainz_ArtistId       song)
+  , "musicbrainz_albumid"        .=? tagFieldToJSON (musicbrainz_AlbumId        song)
+  , "musicbrainz_albumartistid"  .=? tagFieldToJSON (musicbrainz_AlbumartistId  song)
+  , "musicbrainz_trackid"        .=? tagFieldToJSON (musicbrainz_TrackId        song)
+  , "musicbrainz_releasetrackid" .=? tagFieldToJSON (musicbrainz_ReleasetrackId song)
+  , "musicbrainz_workid"         .=? tagFieldToJSON (musicbrainz_WorkId         song)
+  ]
+
+-- | Convert constructor arguments of 'TagField', specially @String@
+-- or @[String]@ under @Maybe@, into a 'Data.Aeson.Value' supported
+-- for encoding. Since 'jsonSongTags' expects @Maybe Value@, extract
+-- them from 'TagField'.
+tagFieldToJSON :: TagField -> Maybe Value
+tagFieldToJSON (SingleTagField ms) = toJSON <$> ms
+tagFieldToJSON (MultiTagField ml) = toJSON <$> ml
 #+end_src
 
 The ~.=?~ operator is a utility function to define optional fields in
@@ -682,31 +875,7 @@ not be included in 'Data.Aeson.object' because of
 (.=?) :: (KeyValue e a, ToJSON v) => Key -> Maybe v -> Maybe a
 key .=? Just value = Just (key .= value)
 _   .=? Nothing    = Nothing
-#+end_src
-
-Encoder helper for filtering list of ~[Maybe Pair]~ key/values.
-#+begin_src haskell
--- | Helper function for creating an JSON 'Data.Aeson.object' where
--- 'Data.Maybe.catMaybes' won't include items from the '[Maybe Pair]'
--- list that return 'Nothing'.
-objectJson :: [Maybe Pair] -> Value
-objectJson = object . catMaybes
-#+end_src
-
-Get the ~Int~ from ~MPD.status~'s ~Either (Status {...})~ fields that use
-the ~MPD.Id~ wrapper: ~stSongID~ and ~stNextSongID~. The current song ID is
-also available in the response from ~MPD.currentSong~ as
-~Either (Maybe (Song {sgId}))~.
-#+begin_src haskell
--- | Extracts the 'Int' value from an 'MPD.Id' within 'MPD.Status', if
--- present and the 'Either' value is a 'Right'.
-getStatusIdInt :: (MPD.Status -> Maybe MPD.Id) -> Either MPD.MPDError MPD.Status -> Maybe Int
-getStatusIdInt item status =
-  case m of
-    Just (MPD.Id int) -> Just int
-    Nothing -> Nothing
-  where
-    m = fromMaybe Nothing $ getStatusField status item
+infixr 8 .=?
 #+end_src
 
 ** mpd-current-json.cabal
@@ -724,9 +893,10 @@ name:               mpd-current-json
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            1.5.0.1
+version:            2.0.0.0
 synopsis:           Print current MPD song and status as JSON
 
+tested-with: GHC == { 9.10.1, 9.4.8 }
 -- A longer description of the package.
 description: Print currently playing MPD's song metadata and status as JSON
 homepage:           https://codeberg.org/useless-utils/mpd-current-json
@@ -748,14 +918,15 @@ source-repository head
     type:      git
     location:  https://codeberg.org/useless-utils/mpd-current-json
 
--- tested-with: GHC == 9.4.8
-
 library
     -- exposed: False
     exposed-modules:  Network.MPD.Parse
+                      Network.MPD.JSON
     build-depends:  base >=4.16 && <5
                   , libmpd == 0.10.*
                   , aeson == 2.2.*
+                  , aeson-pretty == 0.8.*
+                  , bytestring >=0.11 && <0.13
     hs-source-dirs: lib
     default-language: Haskell2010
 
@@ -775,9 +946,9 @@ executable mpd-current-json
                     , libmpd
                     , optparse-applicative == 0.18.*
                     , aeson
-                    , bytestring >=0.11 && <0.13
-                    , aeson-pretty == 0.8.*
-                    , mpd-current-json == 1.5.*
+                    , aeson-pretty
+                    , bytestring
+                    , mpd-current-json
 
     -- Directories containing source files.
     hs-source-dirs:   src
@@ -800,6 +971,20 @@ executable mpd-current-json
 
 * Changelog
 #+begin_src markdown :tangle CHANGELOG.md
+# v2.0
+- Major code rewrite.
+- Add command-line flags:
+  - `-n`: is an alias for `--next`
+  - `-nn`: is an alias for `--next-only`
+  - `--next`: Include information about the next queued song in the
+    output JSON.
+  - `--next-only`: Print only the next queued song's information,
+    replacing the `tags` object.
+- Add support for multi-value tags such as multiple artists. If a tag
+  contains multiple values it should be displayed as an array in the
+  output json.
+- Major performance increase.
+
 # v1.5.0.1
 - Fix `next_filename` to display correct filename URI.
   - It was using Id instead of Position. Position is a 0-indexed
