@@ -1,3 +1,6 @@
+# v2.1
+- Fix multi-value tag arrays being in reverse order.
+
 # v2.0.0.1
 - Fix internal use of function unsupported in `base` version <4.19.
 - Add `-O2` compilation flag to cabal file that benefits from v2.0 refactor.

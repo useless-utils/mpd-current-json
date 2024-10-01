@@ -172,9 +172,15 @@ songToTagField :: Metadata -> Song -> TagField
 songToTagField tag song = tagSingleOrList (MPD.sgGetTag tag song)
   where
     tagSingleOrList :: Maybe [MPD.Value] -> TagField
-    tagSingleOrList val | fmap length val == Just 1 = SingleTagField $ singleValueToString $ listToMaybe (fromMaybe [] val)
-                        | fmap length val > Just 1 = MultiTagField $ multiValueToString val
-                        | otherwise = SingleTagField Nothing
+    tagSingleOrList val
+      | fmap length val == Just 1 =
+          SingleTagField
+          $ singleValueToString
+          $ listToMaybe
+          $ fromMaybe [] val
+      | fmap length val > Just 1 =
+          MultiTagField $ multiValueToString val
+      | otherwise = SingleTagField Nothing
 
 {- | Convert 'Network.MPD.Value' to @String@ within a @Maybe@ context.
 
@@ -186,10 +192,18 @@ singleValueToString :: Maybe MPD.Value -> Maybe String
 singleValueToString (Just x) = Just (MPD.toString x)
 singleValueToString Nothing = Nothing
 
--- | Same as 'singleValueToString' but converts all @Value@s in the
--- multi-value-tag list to @String@ and returns the list.
+{- | Same as 'singleValueToString' but converts all @Value@s in the
+multi-value-tag list to @String@ and returns the list.
+
+`reverse' is used here because multi-value tags are returned in
+reverse order by [libmpd](Network.MPD), e.g. if a song has a
+multi-value @artist@ tag that contains "Artist1; Artist2; Artist3",
+the returned value of 'Network.MPD.Song.sgTags' from
+`Network.MPD.playlistInfo' @-> [Song]@ (which is a way of fetching the
+next song) would be @["Artist3", "Artist2", "Artist1"]@.
+-}
 multiValueToString :: Maybe [MPD.Value] -> Maybe [String]
-multiValueToString (Just x) = Just $ map MPD.toString x
+multiValueToString (Just x) = Just $ reverse $ map MPD.toString x
 multiValueToString Nothing = Nothing
 
 {- | Get the current 'Network.MPD.Song' relative path with 'Network.MPD.sgFilePath'

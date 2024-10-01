@@ -7,7 +7,7 @@ name:               mpd-current-json
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            2.0.0.1
+version:            2.1.0.0
 synopsis:           Print current MPD song and status as JSON
 
 tested-with: GHC == { 9.10.1, 9.4.8 }
