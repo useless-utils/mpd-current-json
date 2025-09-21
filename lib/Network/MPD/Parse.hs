@@ -29,32 +29,32 @@ data TagField = SingleTagField !(Maybe String)
 Each field represents a supported MPD tag.
 -}
 data Tags = Tags
-  { artist                     :: !TagField
-  , artistSort                 :: !TagField
-  , album                      :: !TagField
-  , albumSort                  :: !TagField
-  , albumArtist                :: !TagField
-  , albumArtistSort            :: !TagField
-  , title                      :: !TagField
-  , track                      :: !TagField
-  , name                       :: !TagField
-  , genre                      :: !TagField
-  , date                       :: !TagField
-  , originalDate               :: !TagField
-  , composer                   :: !TagField
-  , performer                  :: !TagField
-  , conductor                  :: !TagField
-  , work                       :: !TagField
-  , grouping                   :: !TagField
-  , comment                    :: !TagField
-  , disc                       :: !TagField
-  , label                      :: !TagField
-  , musicbrainz_ArtistId       :: !TagField
-  , musicbrainz_AlbumId        :: !TagField
-  , musicbrainz_AlbumartistId  :: !TagField
-  , musicbrainz_TrackId        :: !TagField
-  , musicbrainz_ReleasetrackId :: !TagField
-  , musicbrainz_WorkId         :: !TagField
+  { artist                    :: !TagField
+  , artistSort                :: !TagField
+  , album                     :: !TagField
+  , albumSort                 :: !TagField
+  , albumArtist               :: !TagField
+  , albumArtistSort           :: !TagField
+  , title                     :: !TagField
+  , track                     :: !TagField
+  , name                      :: !TagField
+  , genre                     :: !TagField
+  , date                      :: !TagField
+  , originalDate              :: !TagField
+  , composer                  :: !TagField
+  , performer                 :: !TagField
+  , conductor                 :: !TagField
+  , work                      :: !TagField
+  , grouping                  :: !TagField
+  , comment                   :: !TagField
+  , disc                      :: !TagField
+  , label                     :: !TagField
+  , musicbrainzArtistId       :: !TagField
+  , musicbrainzAlbumId        :: !TagField
+  , musicbrainzAlbumartistId  :: !TagField
+  , musicbrainzTrackId        :: !TagField
+  , musicbrainzReleasetrackId :: !TagField
+  , musicbrainzWorkId         :: !TagField
   }
   deriving (Show, Eq, Generic)
 
@@ -94,40 +94,40 @@ instance ToJSON Tags where
           , comment
           , disc
           , label
-          , musicbrainz_ArtistId
-          , musicbrainz_AlbumId
-          , musicbrainz_AlbumartistId
-          , musicbrainz_TrackId
-          , musicbrainz_ReleasetrackId
-          , musicbrainz_WorkId
+          , musicbrainzArtistId
+          , musicbrainzAlbumId
+          , musicbrainzAlbumartistId
+          , musicbrainzTrackId
+          , musicbrainzReleasetrackId
+          , musicbrainzWorkId
           })
     = objectMaybes
-      [ "artist" .=?? artist
-      , "artist_sort" .=?? artistSort
-      , "album" .=?? album
-      , "album_sort" .=?? albumSort
-      , "album_artist" .=?? albumArtist
-      , "album_artist_sort" .=?? albumArtistSort
-      , "title" .=?? title
-      , "track" .=?? track
-      , "name" .=?? name
-      , "genre" .=?? genre
-      , "date" .=?? date
-      , "original_date" .=?? originalDate
-      , "composer" .=?? composer
-      , "performer" .=?? performer
-      , "conductor" .=?? conductor
-      , "work" .=?? work
-      , "grouping" .=?? grouping
-      , "comment" .=?? comment
-      , "disc" .=?? disc
-      , "label" .=?? label
-      , "musicbrainz_artistid" .=?? musicbrainz_ArtistId
-      , "musicbrainz_albumid" .=?? musicbrainz_AlbumId
-      , "musicbrainz_albumartistid" .=?? musicbrainz_AlbumartistId
-      , "musicbrainz_trackid" .=?? musicbrainz_TrackId
-      , "musicbrainz_releasetrackid" .=?? musicbrainz_ReleasetrackId
-      , "musicbrainz_workid" .=?? musicbrainz_WorkId
+      [ "artist"                     .=?? artist
+      , "artist_sort"                .=?? artistSort
+      , "album"                      .=?? album
+      , "album_sort"                 .=?? albumSort
+      , "album_artist"               .=?? albumArtist
+      , "album_artist_sort"          .=?? albumArtistSort
+      , "title"                      .=?? title
+      , "track"                      .=?? track
+      , "name"                       .=?? name
+      , "genre"                      .=?? genre
+      , "date"                       .=?? date
+      , "original_date"              .=?? originalDate
+      , "composer"                   .=?? composer
+      , "performer"                  .=?? performer
+      , "conductor"                  .=?? conductor
+      , "work"                       .=?? work
+      , "grouping"                   .=?? grouping
+      , "comment"                    .=?? comment
+      , "disc"                       .=?? disc
+      , "label"                      .=?? label
+      , "musicbrainz_artistid"       .=?? musicbrainzArtistId
+      , "musicbrainz_albumid"        .=?? musicbrainzAlbumId
+      , "musicbrainz_albumartistid"  .=?? musicbrainzAlbumartistId
+      , "musicbrainz_trackid"        .=?? musicbrainzTrackId
+      , "musicbrainz_releasetrackid" .=?? musicbrainzReleasetrackId
+      , "musicbrainz_workid"         .=?? musicbrainzWorkId
       ]
 
 data WhichSong = Current | Next
@@ -148,36 +148,34 @@ extractFromResponse _ response = response
 
 
 getAllTags :: SongQuery s -> Response (SongData s) -> Tags
-getAllTags query s = Tags
-  { artist                     = f query Artist                     s
-  , artistSort                 = f query ArtistSort                 s
-  , album                      = f query Album                      s
-  , albumSort                  = f query AlbumSort                  s
-  , albumArtist                = f query AlbumArtist                s
-  , albumArtistSort            = f query AlbumArtistSort            s
-  , title                      = f query Title                      s
-  , track                      = f query Track                      s
-  , name                       = f query Name                       s
-  , genre                      = f query Genre                      s
-  , date                       = f query Date                       s
-  , originalDate               = f query OriginalDate               s
-  , composer                   = f query Composer                   s
-  , performer                  = f query Performer                  s
-  , conductor                  = f query Conductor                  s
-  , work                       = f query Work                       s
-  , grouping                   = f query Grouping                   s
-  , comment                    = f query Comment                    s
-  , disc                       = f query Disc                       s
-  , label                      = f query Label                      s
-  , musicbrainz_ArtistId       = f query MUSICBRAINZ_ARTISTID       s
-  , musicbrainz_AlbumId        = f query MUSICBRAINZ_ALBUMID        s
-  , musicbrainz_AlbumartistId  = f query MUSICBRAINZ_ALBUMARTISTID  s
-  , musicbrainz_TrackId        = f query MUSICBRAINZ_TRACKID        s
-  , musicbrainz_ReleasetrackId = f query MUSICBRAINZ_RELEASETRACKID s
-  , musicbrainz_WorkId         = f query MUSICBRAINZ_WORKID         s
+getAllTags query s            = Tags
+  { artist                    = getTag query Artist                     s
+  , artistSort                = getTag query ArtistSort                 s
+  , album                     = getTag query Album                      s
+  , albumSort                 = getTag query AlbumSort                  s
+  , albumArtist               = getTag query AlbumArtist                s
+  , albumArtistSort           = getTag query AlbumArtistSort            s
+  , title                     = getTag query Title                      s
+  , track                     = getTag query Track                      s
+  , name                      = getTag query Name                       s
+  , genre                     = getTag query Genre                      s
+  , date                      = getTag query Date                       s
+  , originalDate              = getTag query OriginalDate               s
+  , composer                  = getTag query Composer                   s
+  , performer                 = getTag query Performer                  s
+  , conductor                 = getTag query Conductor                  s
+  , work                      = getTag query Work                       s
+  , grouping                  = getTag query Grouping                   s
+  , comment                   = getTag query Comment                    s
+  , disc                      = getTag query Disc                       s
+  , label                     = getTag query Label                      s
+  , musicbrainzArtistId       = getTag query MUSICBRAINZ_ARTISTID       s
+  , musicbrainzAlbumId        = getTag query MUSICBRAINZ_ALBUMID        s
+  , musicbrainzAlbumartistId  = getTag query MUSICBRAINZ_ALBUMARTISTID  s
+  , musicbrainzTrackId        = getTag query MUSICBRAINZ_TRACKID        s
+  , musicbrainzReleasetrackId = getTag query MUSICBRAINZ_RELEASETRACKID s
+  , musicbrainzWorkId         = getTag query MUSICBRAINZ_WORKID         s
   }
-  where
-    f = getTag
 
 getTag :: SongQuery s -> Metadata -> Response (SongData s) -> TagField
 getTag QueryCurrent tag response =
