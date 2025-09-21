@@ -22,3 +22,5 @@ cabal.sandbox.config~
 # Custom
 */.trash/
 */bin/
+.aider*
+.env

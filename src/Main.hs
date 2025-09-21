@@ -6,14 +6,6 @@ import qualified Network.MPD as MPD
 import Network.MPD ( PlaybackState(Stopped, Playing, Paused) )
 
 import Network.MPD.Parse
-    ( getAllTags,
-      getStatusField,
-      getStatusFieldElement,
-      getStatusIdInt,
-      maybePathCurrentSong,
-      maybePathNextPlaylistSong,
-      SongCurrentOrNext(..) )
-import Network.MPD.JSON ( objectMaybes, jsonSongTags, (.=?) )
 import Options
        ( optsParserInfo, execParser, Opts(..), NextSongFlag(..) )
 
@@ -89,8 +81,8 @@ main = do
       filenameNext = maybePathNextPlaylistSong nextSong
 
   -- sgTags
-  let jsonCurrentSongTags = jsonSongTags $ getAllTags $ Current currentSong
-      jsonNextSongTags = jsonSongTags $ getAllTags $ Next nextSong
+  let jsonCurrentSongTags = getAllTags QueryCurrent currentSong
+      jsonNextSongTags = getAllTags QueryNext nextSong
 
   -- status
   let jsonStatus = objectMaybes
