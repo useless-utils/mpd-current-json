@@ -9,4 +9,4 @@ progName :: [Char]
 progName = "mpd-current-json"
 
 versionStr :: [Char]
-versionStr = progName ++ " version " ++ (showVersion version)
+versionStr = progName ++ " version " ++ showVersion version

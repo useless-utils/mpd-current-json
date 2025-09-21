@@ -1,22 +1,21 @@
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main ( main ) where
 
-import qualified Network.MPD as MPD
-import Network.MPD ( PlaybackState(Stopped, Playing, Paused) )
-
-import Network.MPD.Parse
-import Options
-       ( optsParserInfo, execParser, Opts(..), NextSongFlag(..) )
-
-import Data.Aeson ( object, KeyValue((.=)) )
-import Data.Aeson.Encode.Pretty
-       ( defConfig, encodePretty', keyOrder, Config(..), Indent(..) )
+import           Data.Aeson
+import           Data.Aeson.Encode.Pretty
+  ( defConfig, encodePretty', keyOrder, Config(..), Indent(..) )
 import qualified Data.ByteString.Lazy.Char8 as C
-import Text.Printf ( printf )
+import qualified Network.MPD as MPD
+import           Network.MPD.Builders
+import           Network.MPD.Parse
+import           Options
+  ( optsParserInfo, execParser, Opts(..), NextSongFlag(..) )
+import           System.Exit
+import           Version
 
-import Text.Read (readMaybe)
-import Data.Maybe (fromMaybe)
+
 {- | Where the program connects to MPD and uses the helper functions to
 extract values, organize them into a list of key/value pairs, make
 them a 'Data.Aeson.Value' using 'Data.Aeson.object', then encode it to
@@ -26,111 +25,22 @@ a conventional JSON @ByteString@ with
 main :: IO ()
 main = do
   opts <- execParser optsParserInfo
+  optsExecVersion opts
 
-  let withMpdOpts = MPD.withMPDEx (optHost opts) (optPort opts) (optPass opts)
+  let withMpdOpts = MPD.withMPDEx opts.optHost opts.optPort opts.optPass
+
   currentSong <- withMpdOpts MPD.currentSong
-  st <- withMpdOpts MPD.status
-
-  let state :: Maybe String
-      state = playbackStateToString <$> getStatusField st MPD.stState
-        where
-          playbackStateToString Playing = "playing"
-          playbackStateToString Paused  = "paused"
-          playbackStateToString Stopped = "stopped"
-
-      time = getStatusFieldElement st MPD.stTime
-      elapsed = fst <$> time
-      duration = snd <$> time
-
-      elapsedPercent :: Maybe Double
-      elapsedPercent = readMaybe percentTwoDecimals
-        where
-          percentTwoDecimals = printf "%.2f" timeToPercent
-          timeToPercent = uncurry (/) t * 100
-          t = fromMaybe (0,0) time
-
-      volumeSt :: Maybe Int
-      volumeSt = fromIntegral <$> getStatusFieldElement st MPD.stVolume
-
-      repeatSt       = getStatusField st MPD.stRepeat
-      randomSt       = getStatusField st MPD.stRandom
-      singleSt       = getStatusField st MPD.stSingle
-      consumeSt      = getStatusField st MPD.stConsume
-      bitrate        = getStatusField st MPD.stBitrate
-      audioFormat    = getStatusField st MPD.stAudio
-      errorSt        = getStatusField st MPD.stError
-
-      updatingDbSt :: Maybe Bool
-      updatingDbSt   = (== 1) <$> getStatusFieldElement st MPD.stUpdatingDb
-
-      crossfadeSt :: Maybe Int
-      crossfadeSt = fromIntegral <$> getStatusField st MPD.stXFadeWidth
-
-      mixRampDbSt = getStatusField st MPD.stMixRampdB
-      mixRampDelay = getStatusField st MPD.stMixRampDelay
-
-  -- positon is an index starting from 0. Id starts from 1
-  let pos            = getStatusField st MPD.stSongPos
-      nextPos        = getStatusFieldElement st MPD.stNextSongPos
-      songId         = getStatusIdInt MPD.stSongID st
-      nextId         = getStatusIdInt MPD.stNextSongID st
-      playlistLength = getStatusField st MPD.stPlaylistLength
-
+  status <- withMpdOpts MPD.status
+  let nextPos = getStatusFieldElement status MPD.stNextSongPos
   nextSong <- withMpdOpts $ MPD.playlistInfo nextPos
-  let filename = maybePathCurrentSong currentSong
-      filenameNext = maybePathNextPlaylistSong nextSong
 
-  -- sgTags
-  let jsonCurrentSongTags = getAllTags QueryCurrent currentSong
-      jsonNextSongTags = getAllTags QueryNext nextSong
+  let mpdState = buildMPDState opts currentSong nextSong status
 
-  -- status
-  let jsonStatus = objectMaybes
-        [ "state"           .=? state
-        , "repeat"          .=? repeatSt
-        , "random"          .=? randomSt
-        , "single"          .=? singleSt
-        , "consume"         .=? consumeSt
-        , "duration"        .=? duration
-        , "elapsed"         .=? elapsed
-        , "elapsed_percent" .=? elapsedPercent
-        , "volume"          .=? volumeSt
-        , "audio_format"    .=? audioFormat
-        , "bitrate"         .=? bitrate
-        , "crossfade"       .=? crossfadeSt
-        , "mixramp_db"      .=? mixRampDbSt
-        , "mixramp_delay"   .=? mixRampDelay
-        , "updating_db"     .=? updatingDbSt
-        , "error"           .=? errorSt
-        ]
+  let finalJson = case optNext opts of
+        OnlyNextSong -> object ["tags" .= mpdNextTags mpdState]
+        _ -> toJSON mpdState
 
-  -- let jFilename = objectMaybes [ "file" .=? filename ]
-
-  let jsonPlaylist = objectMaybes
-        [ "position"      .=? pos
-        , "next_position" .=? nextPos
-        , "id"            .=? songId
-        , "next_id"       .=? nextId
-        , "length"        .=? playlistLength
-        ]
-
-  let jsonBaseObject tags = object
-                $ [ "filename"      .= filename
-                  , "next_filename" .= filenameNext
-                  , "playlist"      .= jsonPlaylist
-                  , "status"        .= jsonStatus
-                  ] ++ tags
-
-  let printJson tags = C.putStrLn
-                       $ encodePretty' customEncodeConf
-                       $ jsonBaseObject tags
-
-  case optNext opts of
-    NoNextSong -> printJson [ "tags" .= jsonCurrentSongTags ]
-
-    OnlyNextSong -> printJson [ "tags" .= jsonNextSongTags ]
-    IncludeNextSong -> printJson [ "tags" .= jsonCurrentSongTags
-                                 , "next" .= object [ "tags" .= jsonNextSongTags ] ]
+  C.putStrLn $ encodePretty' customEncodeConf finalJson
 
 customEncodeConf :: Config
 customEncodeConf = defConfig
@@ -166,3 +76,24 @@ customEncodeConf = defConfig
      ]
  , confIndent = Spaces 2
  }
+
+
+
+-- | Main builder function that creates the complete state
+buildMPDState :: Opts -> MPD.Response (Maybe MPD.Song) -> MPD.Response [MPD.Song]
+              -> MPD.Response MPD.Status -> MPDState
+buildMPDState opts currentSong nextSong status = MPDState
+  { mpdFiles = buildFileInfo currentSong nextSong
+  , mpdStatus = buildPlayerStatus status
+  , mpdPlaylist = buildPlaylistInfo status
+  , mpdTags = getAllTags QueryCurrent currentSong
+  , mpdNextTags = case optNext opts of
+      NoNextSong -> Nothing
+      OnlyNextSong -> Just (getAllTags QueryNext nextSong)
+      IncludeNextSong -> Just (getAllTags QueryNext nextSong)
+  }
+
+optsExecVersion :: Opts -> IO ()
+optsExecVersion opts | opts.optVersion = do putStrLn versionStr
+                                            exitSuccess
+                     | otherwise = pure ()

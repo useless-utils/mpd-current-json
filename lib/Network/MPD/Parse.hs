@@ -1,24 +1,26 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE ImportQualifiedPost #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
+
 
 module Network.MPD.Parse where
 
 
-import Data.Aeson
-    ( object, Key, Value, KeyValue((.=)), ToJSON(toJSON) )
-import Data.Aeson.Types ( Pair )
-import Data.Kind ( Type )
-import Data.Maybe ( catMaybes, fromMaybe, listToMaybe )
-import GHC.Generics ( Generic )
-import Network.MPD
-       ( Metadata(..), Song, PlaybackState(Stopped, Playing, Paused), Response )
-import Network.MPD qualified as MPD
+import           Data.Aeson
+  ( object, Key, Value, KeyValue((.=)), ToJSON(toJSON) )
+import qualified Data.Aeson.KeyMap as KM -- Add this import
+import           Data.Aeson.Types
+import           Data.Kind ( Type )
+import           Data.Maybe ( catMaybes, fromMaybe, listToMaybe )
+import           GHC.Generics
+import           Network.MPD
+  ( Metadata(..), Song, PlaybackState(Stopped, Playing, Paused), Response )
+import qualified Network.MPD as MPD
+
 
 data TagField = SingleTagField !(Maybe String)
               | MultiTagField !(Maybe [String])
@@ -55,6 +57,52 @@ data Tags = Tags
   , musicbrainzTrackId        :: !TagField
   , musicbrainzReleasetrackId :: !TagField
   , musicbrainzWorkId         :: !TagField
+  }
+  deriving (Show, Eq, Generic)
+
+data Status = Status
+  { psState          :: !(Maybe String)
+  , psRepeat         :: !Bool
+  , psRandom         :: !Bool
+  , psSingle         :: !Bool
+  , psConsume        :: !Bool
+  , psDuration       :: !(Maybe MPD.FractionalSeconds)  -- Double
+  , psElapsed        :: !(Maybe MPD.FractionalSeconds)
+  , psElapsedPercent :: !(Maybe Double)
+  , psVolume         :: !(Maybe Int)
+  , psAudioFormat    :: !(Maybe (Int, Int, Int))
+  , psBitrate        :: !(Maybe Int)
+  , psCrossfade      :: !(Maybe Int)
+  , psMixRampDb      :: !(Maybe Double)
+  , psMixRampDelay   :: !(Maybe Double)
+  , psUpdatingDb     :: !(Maybe Bool)
+  , psError          :: !(Maybe String)
+  }
+  deriving (Show, Eq, Generic)
+
+data PlaylistInfo = PlaylistInfo
+  { piPosition     :: !(Maybe MPD.Position)
+  , piNextPosition :: !(Maybe MPD.Position)
+  , piId           :: !(Maybe Int)
+  , piNextId       :: !(Maybe Int)
+  , piLength       :: !(Maybe Int)
+  }
+  deriving (Show, Eq, Generic)
+
+-- | File Information
+data FileInfo = FileInfo
+  { fiCurrentFile :: !(Maybe String)     -- current song file path
+  , fiNextFile    :: !(Maybe String)     -- next song file path
+  }
+  deriving (Show, Eq, Generic)
+
+-- | Complete MPD State
+data MPDState = MPDState
+  { mpdFiles    :: !FileInfo
+  , mpdStatus   :: !Status
+  , mpdPlaylist :: !PlaylistInfo
+  , mpdTags     :: !Tags              -- Your existing Tags type
+  , mpdNextTags :: !(Maybe Tags)      -- Optional next song tags
   }
   deriving (Show, Eq, Generic)
 
@@ -142,10 +190,55 @@ data SongQuery (s :: WhichSong) where
 type CurrentSong = Response (SongData 'Current)
 type NextSong = Response (SongData 'Next)
 
--- Step 4: Function that uses the witness to extract the right type
-extractFromResponse :: SongQuery s -> Response (SongData s) -> Either MPD.MPDError (SongData s)
-extractFromResponse _ response = response
+instance ToJSON Status where
+  toJSON ps = objectMaybes
+    [ "state" .=? Just ps.psState
+    , "repeat" .=? Just ps.psRepeat
+    , "random" .=? Just ps.psRandom
+    , "single" .=? Just ps.psSingle
+    , "consume" .=? Just ps.psConsume
+    , "duration" .=? ps.psDuration
+    , "elapsed" .=? ps.psElapsed
+    , "elapsed_percent" .=? ps.psElapsedPercent
+    , "volume" .=? ps.psVolume
+    , "audio_format" .=? ps.psAudioFormat
+    , "bitrate" .=? ps.psBitrate
+    , "crossfade" .=? ps.psCrossfade
+    , "mixramp_db" .=? ps.psMixRampDb
+    , "mixramp_delay" .=? ps.psMixRampDelay
+    , "updating_db" .=? ps.psUpdatingDb
+    , "error" .=? ps.psError
+    ]
 
+instance ToJSON PlaylistInfo where
+  toJSON pi = objectMaybes
+    [ "position" .=? pi.piPosition
+    , "next_position" .=? pi.piNextPosition
+    , "id" .=? pi.piId
+    , "next_id" .=? pi.piNextId
+    , "length" .=? pi.piLength
+    ]
+
+instance ToJSON FileInfo where
+  toJSON fi = objectMaybes
+    [ "filename" .=? fi.fiCurrentFile
+    , "next_filename" .=? fi.fiNextFile
+    ]
+
+instance ToJSON MPDState where
+  toJSON state = object $ concat
+    [ objectPairs (toJSON state.mpdFiles)
+    , [ "status" .= toJSON state.mpdStatus
+      , "playlist" .= toJSON state.mpdPlaylist
+      , "tags" .= state.mpdTags
+      ]
+    , case state.mpdNextTags of
+        Nothing -> []
+        Just nextTags -> ["next" .= object ["tags" .= nextTags]]
+    ]
+    where
+      objectPairs (Object obj) = [(k, v) | (k, v) <- KM.toList obj]
+      objectPairs _ = []
 
 getAllTags :: SongQuery s -> Response (SongData s) -> Tags
 getAllTags query s            = Tags
