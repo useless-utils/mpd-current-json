@@ -1,9 +1,11 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 
-module Network.MPD.Builders where
+module MPD.Current.JSON.Builders where
+
+import MPD.Current.JSON.Types
+import MPD.Current.JSON.Parse
 
 import Network.MPD qualified as MPD
-import Network.MPD.Parse
 import Data.Maybe
 import Text.Printf
 import Text.Read
@@ -30,7 +32,7 @@ buildPlayerStatus st = Status
   }
   where
     playbackStateToString MPD.Playing = "playing"
-    playbackStateToString MPD.Paused = "paused"
+    playbackStateToString MPD.Paused  = "paused"
     playbackStateToString MPD.Stopped = "stopped"
 
     calcElapsedPercent status = do

@@ -3,17 +3,32 @@
 
 module Main ( main ) where
 
-import           Data.Aeson
-import           Data.Aeson.Encode.Pretty
-  ( defConfig, encodePretty', keyOrder, Config(..), Indent(..) )
-import qualified Data.ByteString.Lazy.Char8 as C
+
+import MPD.Current.JSON.Builders
+    ( buildPlayerStatus, buildPlaylistInfo, buildFileInfo )
+import           MPD.Current.JSON.JSON ()  -- instances
+import MPD.Current.JSON.Types ( MPDState(..) )
+import MPD.Current.JSON.Parse
+    ( SongQuery(QueryNext, QueryCurrent),
+      getAllTags,
+      getStatusFieldElement )
 import qualified Network.MPD as MPD
-import           Network.MPD.Builders
-import           Network.MPD.Parse
-import           Options
-  ( optsParserInfo, execParser, Opts(..), NextSongFlag(..) )
-import           System.Exit
-import           Version
+import Options
+    ( Opts(optVersion, optNext, optHost, optPort, optPass),
+      NextSongFlag(IncludeNextSong, NoNextSong, OnlyNextSong),
+      optsParserInfo,
+      execParser )
+
+import Data.Aeson ( object, KeyValue((.=)), ToJSON(toJSON) )
+import Data.Aeson.Encode.Pretty
+    ( defConfig,
+      encodePretty',
+      keyOrder,
+      Config(confIndent, confCompare),
+      Indent(Spaces) )
+import qualified Data.ByteString.Lazy.Char8 as C
+import System.Exit ( exitSuccess )
+import Version ( versionStr )
 
 
 {- | Where the program connects to MPD and uses the helper functions to

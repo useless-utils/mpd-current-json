@@ -34,8 +34,10 @@ source-repository head
 
 library
     -- exposed: False
-    exposed-modules:  Network.MPD.Parse
-                      Network.MPD.Builders
+    exposed-modules:  MPD.Current.JSON.Parse
+                      MPD.Current.JSON.Builders
+                      MPD.Current.JSON.Types
+                      MPD.Current.JSON.JSON
     build-depends:  base >=4.16 && <5
                   , libmpd == 0.10.*
                   , aeson == 2.2.*
@@ -81,4 +83,3 @@ executable mpd-current-json
                     -Wunused-packages
                     -fwrite-ide-info
                     -hiedir=.hie
-                    -O2

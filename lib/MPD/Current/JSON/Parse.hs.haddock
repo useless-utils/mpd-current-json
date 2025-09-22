@@ -1,0 +1,1047 @@
+{-|
+Module      : Network.MPD.Parse
+Description : Type-safe parsing and data structures for MPD responses
+Copyright   : (c) Lucas Gabriel
+License     : MIT
+Maintainer  : your-email@example.com
+Stability   : experimental
+
+This module provides the core data structures and parsing logic for handling
+MPD (Music Player Daemon) responses. It uses advanced Haskell features like
+GADTs, type families, and generics to ensure type safety and performance.
+
+=== Design Philosophy
+
+The module follows several key principles:
+
+* __Type Safety__: Uses GADTs and type families to prevent runtime errors
+* __Performance__: Strict fields and efficient data structures
+* __Memory Safety__: Proper handling of Maybe types for optional data
+* __Extensibility__: Generic deriving for automatic JSON serialization
+
+=== Architecture Overview
+
+The parsing system is built around several key components:
+
+1. __Data Types__: 'Tags', 'Status', 'PlaylistInfo', 'FileInfo', 'MPDState'
+2. __Type-Safe Queries__: 'SongQuery' GADT with 'WhichSong' kind
+3. __JSON Serialization__: Custom 'ToJSON' instances with optional fields
+4. __Helper Functions__: Safe extraction and conversion utilities
+
+=== Example Usage
+
+@
+{-# LANGUAGE DataKinds #-}
+import qualified Network.MPD as MPD
+import Network.MPD.Parse
+
+main :: IO ()
+main = do
+  currentSong <- MPD.withMPD MPD.currentSong
+  let tags = getAllTags QueryCurrent currentSong
+  print tags
+@
+-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
+
+module Network.MPD.Parse
+  ( -- * Core Data Types
+    TagField(..)
+  , Tags(..)
+  , Status(..)
+  , PlaylistInfo(..)
+  , FileInfo(..)
+  , MPDState(..)
+    -- * Type-Safe Song Queries
+  , WhichSong(..)
+  , SongQuery(..)
+  , SongData
+  , CurrentSong
+  , NextSong
+    -- * Parsing Functions
+  , getAllTags
+  , getTag
+  , songToTagField
+    -- * Status Extraction
+  , getStatusField
+  , getStatusFieldElement
+  , getStatusIdInt
+    -- * Path Utilities
+  , maybePathCurrentSong
+  , maybePathNextPlaylistSong
+    -- * Value Conversion
+  , singleValueToString
+  , multiValueToString
+    -- * JSON Utilities
+  , OptionalToJSON(..)
+  , objectMaybes
+  , (.=?)
+  , (.=??)
+  ) where
+
+import Data.Aeson
+  ( object, Key, Value, KeyValue((.=)), ToJSON(toJSON) )
+import qualified Data.Aeson.KeyMap as KM
+import Data.Aeson.Types
+import Data.Kind ( Type )
+import Data.Maybe ( catMaybes, fromMaybe, listToMaybe )
+import GHC.Generics
+import Network.MPD
+  ( Metadata(..), Song, PlaybackState(Stopped, Playing, Paused), Response )
+import qualified Network.MPD as MPD
+
+{- | Wrapper for MPD tag values supporting both single and multi-value tags.
+
+MPD tags can contain either a single value or multiple values (e.g., multiple artists).
+This type safely represents both cases while maintaining type information.
+
+==== Design Rationale
+
+Originally, this was just @Maybe String@, but multi-value tag support required
+a more sophisticated approach. The 'TagField' type allows storing either case
+in the same data structure field, improving type safety.
+
+==== Performance Considerations
+
+Strict fields (@!@) are used to avoid space leaks. May help for tags that
+are 'Nothing' frequently.
+-}
+data TagField = SingleTagField !(Maybe String)   -- ^ Single-value tag (most common)
+              | MultiTagField !(Maybe [String])   -- ^ Multi-value tag (e.g., multiple artists)
+  deriving (Show, Eq)
+
+{- | Complete collection of MPD tag information for a song.
+
+This record contains all the metadata tags that MPD supports, organized
+into logical groups. Each field is a 'TagField' to support both single
+and multi-value scenarios.
+
+==== Tag Categories
+
+* __Basic__: 'artist', 'album', 'title', 'track'
+* __Extended__: 'composer', 'performer', 'conductor', 'work'
+* __Sorting__: 'artistSort', 'albumSort', 'albumArtistSort'
+* __Organizational__: 'genre', 'date', 'disc', 'grouping'
+* __MusicBrainz__: All @musicbrainz*@ fields for external database linking
+
+@
+-- Example: Extract artist information
+let tags = getAllTags QueryCurrent currentSongResponse
+case artist tags of
+  SingleTagField (Just artistName) -> print artistName
+  MultiTagField (Just artists) -> mapM_ print artists
+  _ -> putStrLn \"No artist information\"
+@
+-}
+data Tags = Tags
+  { artist                    :: !TagField -- ^ Primary artist(s)
+  , artistSort                :: !TagField -- ^ Artist name for sorting
+  , album                     :: !TagField -- ^ Album name
+  , albumSort                 :: !TagField -- ^ Album name for sorting
+  , albumArtist               :: !TagField -- ^ Album artist (may differ from track artist)
+  , albumArtistSort           :: !TagField -- ^ Album artist for sorting
+  , title                     :: !TagField -- ^ Song title
+  , track                     :: !TagField -- ^ Track number (e.g., \"01\", \"1/12\")
+  , name                      :: !TagField -- ^ Stream name (for radio streams)
+  , genre                     :: !TagField -- ^ Musical genre
+  , date                      :: !TagField -- ^ Release date
+  , originalDate              :: !TagField -- ^ Original release date
+  , composer                  :: !TagField -- ^ Composer name
+  , performer                 :: !TagField -- ^ Performer name
+  , conductor                 :: !TagField -- ^ Conductor name
+  , work                      :: !TagField -- ^ Work/opus name
+  , grouping                  :: !TagField -- ^ Custom grouping
+  , comment                   :: !TagField -- ^ Free-form comment
+  , disc                      :: !TagField -- ^ Disc number (e.g., \"1\", \"1/2\")
+  , label                     :: !TagField -- ^ Record label
+  , musicbrainzArtistId       :: !TagField -- ^ MusicBrainz artist ID
+  , musicbrainzAlbumId        :: !TagField -- ^ MusicBrainz album ID
+  , musicbrainzAlbumartistId  :: !TagField -- ^ MusicBrainz album artist ID
+  , musicbrainzTrackId        :: !TagField -- ^ MusicBrainz track ID
+  , musicbrainzReleasetrackId :: !TagField -- ^ MusicBrainz release track ID
+  , musicbrainzWorkId         :: !TagField -- ^ MusicBrainz work ID
+  } deriving (Show, Eq, Generic)
+
+{- | Current MPD player status information.
+
+Contains all relevant information about the current state of the MPD player,
+including playback state, audio settings, and timing information.
+
+==== Boolean Fields Default Behavior
+
+Boolean fields like 'psRepeat' default to 'False' when not available,
+as this represents the typical \"disabled\" state for these features.
+
+==== Timing Information
+
+* 'psDuration': Total song length
+* 'psElapsed': Current playback position
+* 'psElapsedPercent': Calculated percentage (0-100)
+
+==== Audio Quality Fields
+
+* 'psAudioFormat': Tuple of (sample_rate, bits, channels)
+* 'psBitrate': Current bitrate in kbps
+* 'psVolume': Volume level (0-100)
+-}
+data Status = Status
+  { psState           :: !(Maybe String)            -- ^ \"playing\", \"paused\", or \"stopped\"
+  , psRepeat          :: !Bool                      -- ^ Repeat mode enabled
+  , psRandom          :: !Bool                      -- ^ Random/shuffle mode enabled
+  , psSingle          :: !Bool                      -- ^ Single mode enabled
+  , psConsume         :: !Bool                      -- ^ Consume mode enabled
+  , psDuration        :: !(Maybe MPD.FractionalSeconds) -- ^ Total song duration
+  , psElapsed         :: !(Maybe MPD.FractionalSeconds) -- ^ Elapsed playback time
+  , psElapsedPercent  :: !(Maybe Double)            -- ^ Elapsed time as percentage
+  , psVolume          :: !(Maybe Int)               -- ^ Volume level (0-100)
+  , psAudioFormat     :: !(Maybe (Int, Int, Int))   -- ^ (sample_rate, bits, channels)
+  , psBitrate         :: !(Maybe Int)               -- ^ Current bitrate in kbps
+  , psCrossfade       :: !(Maybe Int)               -- ^ Crossfade duration in seconds
+  , psMixRampDb       :: !(Maybe Double)            -- ^ MixRamp threshold in dB
+  , psMixRampDelay    :: !(Maybe Double)            -- ^ MixRamp delay in seconds
+  , psUpdatingDb      :: !(Maybe Bool)              -- ^ Database update in progress
+  , psError           :: !(Maybe String)            -- ^ Last player error message
+  } deriving (Show, Eq, Generic)
+
+{- | Current playlist information and position.
+
+Provides information about the current position in the playlist and
+identifies songs by both position (index) and ID (unique identifier).
+
+==== Position vs ID Semantics
+
+* __Position__: 0-based index, changes when playlist is reordered
+* __ID__: Unique identifier starting from 1, persists across changes
+
+This distinction is crucial for playlist manipulation - positions change
+but IDs remain constant until the song is removed.
+-}
+data PlaylistInfo = PlaylistInfo
+  { piPosition     :: !(Maybe MPD.Position)  -- ^ Current song position (0-based)
+  , piNextPosition :: !(Maybe MPD.Position)  -- ^ Next song position
+  , piId           :: !(Maybe Int)           -- ^ Current song unique ID
+  , piNextId       :: !(Maybe Int)           -- ^ Next song unique ID
+  , piLength       :: !(Maybe Int)           -- ^ Total playlist length
+  } deriving (Show, Eq, Generic)
+
+{- | File path information for current and next songs.
+
+Contains the relative file paths for the currently playing song and
+the next song in the playlist. Paths are relative to MPD's music directory.
+
+==== Path Safety
+
+File paths are carefully validated during extraction to ensure they
+represent actual files in MPD's database. Invalid or missing paths
+result in 'Nothing' values.
+-}
+data FileInfo = FileInfo
+  { fiCurrentFile :: !(Maybe String)  -- ^ Current song file path
+  , fiNextFile    :: !(Maybe String)  -- ^ Next song file path
+  } deriving (Show, Eq, Generic)
+
+{- | Complete MPD state combining all information sources.
+
+This is the top-level data structure that combines player status,
+playlist information, file paths, and tag metadata into a single
+coherent representation of MPD's current state.
+
+==== Design Benefits
+
+* Single source of truth for all MPD information
+* Type-safe combination of related data
+* Efficient JSON serialization
+* Clear separation of concerns
+
+==== Usage Pattern
+
+Typically constructed using builder functions from "Network.MPD.Builders":
+
+@
+mpdState = MPDState
+  { mpdFiles = buildFileInfo currentSong nextSong
+  , mpdStatus = buildPlayerStatus status
+  , mpdPlaylist = buildPlaylistInfo status
+  , mpdTags = getAllTags QueryCurrent currentSong
+  , mpdNextTags = getAllTags QueryNext nextSong
+  }
+@
+-}
+data MPDState = MPDState
+  { mpdFiles    :: !FileInfo       -- ^ File path information
+  , mpdStatus   :: !Status         -- ^ Player status
+  , mpdPlaylist :: !PlaylistInfo   -- ^ Playlist information
+  , mpdTags     :: !Tags           -- ^ Current song tags
+  , mpdNextTags :: !(Maybe Tags)   -- ^ Next song tags (optional)
+  } deriving (Show, Eq, Generic)
+
+{- | Kind for distinguishing between current and next song queries.
+
+This DataKind is used at the type level to ensure compile-time safety
+when working with different types of song data. It prevents mixing up
+current song operations with next song operations.
+-}
+data WhichSong = Current  -- ^ Represents the currently playing song
+               | Next     -- ^ Represents the next song in playlist
+
+{- | Type family mapping song types to their corresponding data structures.
+
+This type family provides the connection between the 'WhichSong' kind
+and the actual data types returned by MPD operations:
+
+* Current songs: @Maybe Song@ (might not be playing anything)
+* Next songs: @[Song]@ (playlist query result)
+
+==== Type Safety Benefits
+
+This ensures that you cannot accidentally pass next song data to a
+function expecting current song data, catching errors at compile time
+rather than runtime.
+-}
+type family SongData (s :: WhichSong) :: Type where
+  SongData 'Current = Maybe Song   -- ^ Current song may not exist
+  SongData 'Next = [Song]          -- ^ Next song comes from playlist query
+
+{- | GADT for type-safe song queries.
+
+This Generalized Algebraic Data Type provides compile-time guarantees
+about which type of song data you're working with. The constructors
+serve as type witnesses that prove the intent at the type level.
+
+==== GADT Benefits
+
+* Eliminates runtime type errors
+* Makes impossible states unrepresentable
+* Provides better error messages
+* Enables more aggressive compiler optimizations
+
+==== Usage Example
+
+@
+-- This is guaranteed to work with Maybe Song data
+currentTags = getAllTags QueryCurrent currentSongResponse
+
+-- This is guaranteed to work with [Song] data
+nextTags = getAllTags QueryNext nextSongResponse
+
+-- This would be a compile error:
+-- getAllTags QueryCurrent nextSongResponse  -- Type error!
+@
+-}
+data SongQuery (s :: WhichSong) where
+  QueryCurrent :: SongQuery 'Current  -- ^ Query for current song
+  QueryNext    :: SongQuery 'Next     -- ^ Query for next song
+
+-- | Type alias for current song responses from MPD.
+type CurrentSong = Response (SongData 'Current)
+
+-- | Type alias for next song responses from MPD.
+type NextSong = Response (SongData 'Next)
+
+{- | Type class for optional JSON serialization.
+
+This class provides a way to convert values to JSON only when they
+contain meaningful data, supporting the optional field pattern used
+throughout the JSON output.
+
+==== Design Pattern
+
+Instead of serializing fields with @null@ values, this class allows
+fields to be omitted entirely from the JSON output when they don't
+contain useful information.
+-}
+class OptionalToJSON a where
+  -- | Convert a value to JSON, returning 'Nothing' if no meaningful data exists.
+  tagFieldToJSON :: a -> Maybe Value
+
+instance OptionalToJSON TagField where
+  tagFieldToJSON (SingleTagField ms) = toJSON <$> ms
+  tagFieldToJSON (MultiTagField ml) = toJSON <$> ml
+
+{- | Enhanced operator that works like '.=' but omits Nothing values.
+
+This operator extends Aeson's '.=' to work with 'OptionalToJSON' instances,
+automatically omitting fields that don't have meaningful values.
+
+==== Usage
+
+@
+objectMaybes
+  [ "artist" .=?? artistField
+  , "album" .=?? albumField
+  ]
+@
+
+Fields with no data will be omitted from the resulting JSON object.
+-}
+(.=??) :: OptionalToJSON a => Key -> a -> Maybe Pair
+key .=?? field = (key .=) <$> tagFieldToJSON field
+infixr 8 .=??
+
+{- | Standard operator for including optional values in JSON objects.
+
+This operator provides a cleaner way to handle 'Maybe' values in JSON
+serialization, omitting 'Nothing' values entirely rather than serializing
+them as @null@.
+
+Examples:
+
+@
+-- Instead of:
+object [ "volume" .= (case volume of Just v -> toJSON v; Nothing -> Null) ]
+
+-- Use:
+objectMaybes [ "volume" .=? volume ]
+@
+
+The second form is more concise and handles the optional logic automatically.
+
+Design Benefits:
+* Cleaner JSON output without unnecessary null fields
+* More readable code with less boilerplate
+* Consistent handling of optional data throughout the application
+
+Performance:
+* No overhead compared to manual null checking
+* 'catMaybes' efficiently filters out 'Nothing' values
+* JSON objects are smaller without null fields
+-}
+(.=?) :: (KeyValue e a, ToJSON v) => Key -> Maybe v -> Maybe a
+key .=? Just value = Just (key .= value)
+_ .=? Nothing = Nothing
+infixr 8 .=?
+
+{- | Create JSON object from list of optional key-value pairs.
+
+This function works with the '.=?' operator to create JSON objects that
+automatically omit fields containing 'Nothing' values. It uses 'catMaybes'
+to filter out 'Nothing' pairs before constructing the object.
+
+Usage Pattern:
+
+@
+instance ToJSON MyRecord where
+  toJSON record = objectMaybes
+    [ "field1" .=? record.field1  -- Maybe String
+    , "field2" .=? record.field2  -- Maybe Int
+    , "field3" .=? record.field3  -- Maybe Bool
+    ]
+@
+
+Benefits:
+* Clean JSON output without null pollution
+* Consistent handling across all data types
+* Efficient filtering of empty values
+* Reduced JSON payload size
+
+Implementation Details:
+* Uses 'catMaybes' for efficient filtering
+* Maintains field ordering from input list
+* No performance penalty for optional fields
+-}
+objectMaybes :: [Maybe Pair] -> Value
+objectMaybes = object . catMaybes
+
+{- | JSON serialization instances for all data types.
+
+These instances use the optional field pattern throughout, ensuring
+clean JSON output without unnecessary null values.
+-}
+
+{- | Tags JSON instance with comprehensive field mapping.
+
+The Tags instance demonstrates several key patterns:
+
+Field Naming Convention:
+* Haskell camelCase -> JSON snake_case
+* Consistent underscore usage for multi-word fields
+* MusicBrainz fields keep standard naming
+
+Optional Field Handling:
+* All tag fields are optional (using '.=??')
+* Missing tags result in omitted JSON fields
+* Multi-value tags are serialized as arrays
+
+Field Ordering:
+The fields are ordered logically rather than alphabetically:
+1. Primary identification (artist, title, album)
+2. Secondary metadata (track, disc, date)
+3. Extended information (composer, performer, etc.)
+4. Technical metadata (MusicBrainz IDs)
+
+This ordering makes the JSON more readable for both humans and consuming
+applications that expect common fields first.
+-}
+instance ToJSON Tags where
+  toJSON (Tags
+    { artist
+    , artistSort
+    , album
+    , albumSort
+    , albumArtist
+    , albumArtistSort
+    , title
+    , track
+    , name
+    , genre
+    , date
+    , originalDate
+    , composer
+    , performer
+    , conductor
+    , work
+    , grouping
+    , comment
+    , disc
+    , label
+    , musicbrainzArtistId
+    , musicbrainzAlbumId
+    , musicbrainzAlbumartistId
+    , musicbrainzTrackId
+    , musicbrainzReleasetrackId
+    , musicbrainzWorkId
+    })
+    = objectMaybes
+      [ "artist" .=?? artist
+      , "artist_sort" .=?? artistSort
+      , "album" .=?? album
+      , "album_sort" .=?? albumSort
+      , "album_artist" .=?? albumArtist
+      , "album_artist_sort" .=?? albumArtistSort
+      , "title" .=?? title
+      , "track" .=?? track
+      , "name" .=?? name
+      , "genre" .=?? genre
+      , "date" .=?? date
+      , "original_date" .=?? originalDate
+      , "composer" .=?? composer
+      , "performer" .=?? performer
+      , "conductor" .=?? conductor
+      , "work" .=?? work
+      , "grouping" .=?? grouping
+      , "comment" .=?? comment
+      , "disc" .=?? disc
+      , "label" .=?? label
+      , "musicbrainz_artistid" .=?? musicbrainzArtistId
+      , "musicbrainz_albumid" .=?? musicbrainzAlbumId
+      , "musicbrainz_albumartistid" .=?? musicbrainzAlbumartistId
+      , "musicbrainz_trackid" .=?? musicbrainzTrackId
+      , "musicbrainz_releasetrackid" .=?? musicbrainzReleasetrackId
+      , "musicbrainz_workid" .=?? musicbrainzWorkId
+      ]
+
+{- | Status JSON instance with complete player state representation.
+
+The Status instance covers all aspects of MPD player state:
+
+Playback State:
+* Current state (playing/paused/stopped)
+* Playback modes (repeat, random, single, consume)
+* Time information (duration, elapsed, percentage)
+
+Audio Information:
+* Volume level and audio format details
+* Bitrate and crossfading settings
+* MixRamp configuration for gapless playback
+
+Technical Status:
+* Database update status
+* Error messages from MPD
+* Advanced audio processing settings
+
+Boolean Field Handling:
+Boolean fields like repeat/random are always included (using '.=?' with 'Just')
+because their absence would be ambiguous - false is meaningful information.
+
+Audio Format Representation:
+Audio format is a tuple (sample_rate, bits, channels) that gets serialized
+as a JSON array: [44100, 16, 2] for CD quality stereo.
+-}
+instance ToJSON Status where
+  toJSON ps = objectMaybes
+    [ "state" .=? Just ps.psState
+    , "repeat" .=? Just ps.psRepeat
+    , "random" .=? Just ps.psRandom
+    , "single" .=? Just ps.psSingle
+    , "consume" .=? Just ps.psConsume
+    , "duration" .=? ps.psDuration
+    , "elapsed" .=? ps.psElapsed
+    , "elapsed_percent" .=? ps.psElapsedPercent
+    , "volume" .=? ps.psVolume
+    , "audio_format" .=? ps.psAudioFormat
+    , "bitrate" .=? ps.psBitrate
+    , "crossfade" .=? ps.psCrossfade
+    , "mixramp_db" .=? ps.psMixRampDb
+    , "mixramp_delay" .=? ps.psMixRampDelay
+    , "updating_db" .=? ps.psUpdatingDb
+    , "error" .=? ps.psError
+    ]
+
+{- | PlaylistInfo JSON instance for playlist position data.
+
+This instance handles the dual nature of MPD playlist identification:
+
+Position vs ID Semantics:
+* position: 0-based index that changes with playlist reordering
+* id: unique identifier (starting from 1) that persists
+
+Both current and next song information is included to support
+applications that need to know what's coming next.
+
+The 'length' field provides total playlist size for progress
+indicators or playlist management interfaces.
+
+All fields are optional because they may not be available when
+no song is playing or the playlist is empty.
+-}
+instance ToJSON PlaylistInfo where
+  toJSON pi = objectMaybes
+    [ "position" .=? pi.piPosition
+    , "next_position" .=? pi.piNextPosition
+    , "id" .=? pi.piId
+    , "next_id" .=? pi.piNextId
+    , "length" .=? pi.piLength
+    ]
+
+{- | FileInfo JSON instance for file path information.
+
+Simple instance that provides file paths for current and next songs.
+File paths are relative to MPD's music directory root.
+
+Path Safety:
+* Paths are validated during extraction
+* Invalid paths result in 'Nothing' (omitted from JSON)
+* Only actual files in MPD's database are included
+
+These paths can be used by clients for:
+* Audio file access (if sharing the same filesystem)
+* Metadata lookup from external sources
+* File management operations
+-}
+instance ToJSON FileInfo where
+  toJSON fi = objectMaybes
+    [ "filename" .=? fi.fiCurrentFile
+    , "next_filename" .=? fi.fiNextFile
+    ]
+
+{- | Complete MPD state JSON representation.
+
+The MPDState instance creates the final JSON structure that combines
+all MPD information into a coherent response.
+
+JSON Structure:
+@
+{
+  "filename": "path/to/current.flac",      -- From FileInfo
+  "next_filename": "path/to/next.flac",    -- From FileInfo
+  "status": { ... },                       -- Complete Status object
+  "playlist": { ... },                     -- PlaylistInfo object
+  "tags": { ... },                         -- Current song Tags
+  "next": { "tags": { ... } }              -- Next song Tags (conditional)
+}
+@
+
+Flat vs Nested Structure:
+* File information is flattened to top level for easy access
+* Status and playlist are nested objects for logical grouping
+* Next song information is conditionally included
+
+The 'objectPairs' helper function flattens the FileInfo JSON object
+into the top-level structure, avoiding unnecessary nesting for
+commonly-accessed file path information.
+
+Performance Considerations:
+* Minimal object construction overhead
+* Conditional next song inclusion saves bandwidth
+* Efficient KeyMap operations for object manipulation
+-}
+instance ToJSON MPDState where
+  toJSON state = object $ concat
+    [ objectPairs (toJSON state.mpdFiles)
+    , [ "status" .= toJSON state.mpdStatus
+      , "playlist" .= toJSON state.mpdPlaylist
+      , "tags" .= state.mpdTags
+      ]
+    , case state.mpdNextTags of
+        Nothing -> []
+        Just nextTags -> ["next" .= object ["tags" .= nextTags]]
+    ]
+    where
+      objectPairs (Object obj) = [(k, v) | (k, v) <- KM.toList obj]
+      objectPairs _ = []
+
+{- | Core tag extraction and parsing functions.
+
+These functions implement the type-safe tag extraction system using
+GADTs to ensure compile-time correctness.
+-}
+
+{- | Extract complete tag information for a song using type-safe queries.
+
+This function serves as the main entry point for tag extraction, building
+a complete 'Tags' record from MPD song data using the GADT-based query system.
+
+Type Safety:
+* 'SongQuery' parameter ensures correct data type usage
+* Compile-time verification prevents mixing current/next song data
+* Each tag extraction is individually type-checked
+
+Coverage:
+The function extracts all supported MPD tags, organized into categories:
+* Basic: artist, album, title, track
+* Extended: composer, performer, conductor, work
+* Organizational: genre, date, disc, grouping
+* Technical: MusicBrainz identifiers
+
+Usage Examples:
+
+@
+-- Type-safe current song extraction
+currentTags = getAllTags QueryCurrent currentSongResponse
+
+-- Type-safe next song extraction
+nextTags = getAllTags QueryNext nextSongResponse
+
+-- This would be a compile error:
+-- getAllTags QueryCurrent nextSongResponse  -- Wrong data type!
+@
+
+Performance:
+* Single pass through song data
+* Efficient field-by-field extraction
+* No unnecessary intermediate allocations
+* Strict evaluation prevents space leaks
+-}
+getAllTags :: SongQuery s -> Response (SongData s) -> Tags
+getAllTags query s = Tags
+  { artist = getTag query Artist s
+  , artistSort = getTag query ArtistSort s
+  , album = getTag query Album s
+  , albumSort = getTag query AlbumSort s
+  , albumArtist = getTag query AlbumArtist s
+  , albumArtistSort = getTag query AlbumArtistSort s
+  , title = getTag query Title s
+  , track = getTag query Track s
+  , name = getTag query Name s
+  , genre = getTag query Genre s
+  , date = getTag query Date s
+  , originalDate = getTag query OriginalDate s
+  , composer = getTag query Composer s
+  , performer = getTag query Performer s
+  , conductor = getTag query Conductor s
+  , work = getTag query Work s
+  , grouping = getTag query Grouping s
+  , comment = getTag query Comment s
+  , disc = getTag query Disc s
+  , label = getTag query Label s
+  , musicbrainzArtistId = getTag query MUSICBRAINZ_ARTISTID s
+  , musicbrainzAlbumId = getTag query MUSICBRAINZ_ALBUMID s
+  , musicbrainzAlbumartistId = getTag query MUSICBRAINZ_ALBUMARTISTID s
+  , musicbrainzTrackId = getTag query MUSICBRAINZ_TRACKID s
+  , musicbrainzReleasetrackId = getTag query MUSICBRAINZ_RELEASETRACKID s
+  , musicbrainzWorkId = getTag query MUSICBRAINZ_WORKID s
+  }
+
+{- | Type-safe tag extraction with GADT dispatch.
+
+This function demonstrates the power of GADTs for compile-time safety.
+The two pattern matches handle the different data types automatically
+based on the query type, ensuring no runtime type errors.
+
+QueryCurrent Case:
+* Expects 'Response (Maybe Song)'
+* Handles connection errors and empty results
+* Single song processing
+
+QueryNext Case:
+* Expects 'Response [Song]'
+* Handles playlist query results
+* Ensures exactly one next song (playlist behavior)
+
+Error Handling:
+* Connection errors -> 'SingleTagField Nothing'
+* Missing data -> 'SingleTagField Nothing'
+* Multiple next songs -> 'SingleTagField Nothing' (unexpected state)
+
+The GADT system makes it impossible to pass the wrong data type
+to the wrong handler, catching errors at compile time.
+
+GADT Benefits Demonstrated:
+* Type safety without runtime checking
+* Exhaustive pattern matching guaranteed
+* Clear separation of concerns
+* Better error messages from compiler
+-}
+getTag :: SongQuery s -> Metadata -> Response (SongData s) -> TagField
+getTag QueryCurrent tag response =
+  case response of
+    Left _ -> SingleTagField Nothing
+    Right maybeSong -> case maybeSong of
+      Just song -> songToTagField tag song
+      Nothing -> SingleTagField Nothing
+
+getTag QueryNext tag response =
+  case response of
+    Left _ -> SingleTagField Nothing
+    Right songs -> case songs of
+      [song] -> songToTagField tag song
+      _ -> SingleTagField Nothing  -- 0 or multiple songs
+
+{- | Extract tag value from MPD Song data.
+
+This function handles the conversion from MPD's internal tag representation
+to our 'TagField' type, supporting both single and multi-value tags.
+
+Multi-Value Tag Support:
+MPD supports tags with multiple values (e.g., multiple artists).
+The function detects this case and uses the appropriate 'TagField' constructor.
+
+Value Processing:
+* Single value: 'SingleTagField (Maybe String)'
+* Multiple values: 'MultiTagField (Maybe [String])'
+* No values: 'SingleTagField Nothing'
+
+The 'tagSingleOrList' helper function performs the actual logic:
+* Length 1: Single value tag
+* Length > 1: Multi-value tag
+* Length 0 or Nothing: No tag data
+
+Performance Optimization:
+* Direct pattern matching on list length
+* Minimal intermediate allocations
+* Efficient conversion from MPD's Value type
+-}
+songToTagField :: Metadata -> Song -> TagField
+songToTagField tag song = tagSingleOrList (MPD.sgGetTag tag song)
+  where
+    tagSingleOrList :: Maybe [MPD.Value] -> TagField
+    tagSingleOrList val
+      | fmap length val == Just 1 =
+          SingleTagField
+            $ singleValueToString
+            $ listToMaybe
+            $ fromMaybe [] val
+      | fmap length val > Just 1 =
+          MultiTagField $ multiValueToString val
+      | otherwise = SingleTagField Nothing
+
+{- | Helper functions for MPD status field extraction.
+
+These functions provide safe extraction of fields from MPD's Status
+response, handling connection errors and missing fields gracefully.
+-}
+
+{- | Extract a field from MPD Status response.
+
+This function safely extracts fields from MPD status responses,
+handling both connection errors and successful responses uniformly.
+
+Error Handling:
+* Connection error ('Left'): Returns 'Nothing'
+* Successful response ('Right'): Applies field accessor
+
+Usage Pattern:
+
+@
+status <- MPD.withMPD MPD.status
+let volume = getStatusField status MPD.stVolume
+-- volume :: Maybe (Maybe Int)  -- Double Maybe for optional fields
+@
+
+The double Maybe pattern handles:
+* Outer Maybe: Connection success/failure
+* Inner Maybe: Field presence in MPD status
+
+This function is the foundation for all status field extraction
+throughout the application.
+-}
+getStatusField :: MPD.Response MPD.Status -> (MPD.Status -> a) -> Maybe a
+getStatusField (Right st) f = Just (f st)
+getStatusField _ _ = Nothing
+
+{- | Extract optional fields from MPD Status with flattened Maybe.
+
+For fields that are already Maybe types in MPD's Status record,
+this function flattens the double Maybe into a single Maybe.
+
+Double Maybe Problem:
+@
+getStatusField status MPD.stVolume  -- Maybe (Maybe Int)
+getStatusFieldElement status MPD.stVolume  -- Maybe Int
+@
+
+The 'Element' version is more convenient for optional fields
+where you just want to know if the value exists and what it is.
+
+Implementation:
+Uses 'fromMaybe Nothing' to flatten 'Maybe (Maybe a)' to 'Maybe a':
+* 'Just (Just x)' -> 'Just x'
+* 'Just Nothing' -> 'Nothing'
+* 'Nothing' -> 'Nothing'
+
+This pattern is common throughout the codebase for optional MPD fields.
+-}
+getStatusFieldElement :: MPD.Response MPD.Status -> (MPD.Status -> Maybe a) -> Maybe a
+getStatusFieldElement status item = fromMaybe Nothing $ getStatusField status item
+
+{- | Extract integer values from MPD Id fields.
+
+MPD uses a special 'Id' type for playlist song identifiers.
+This function safely extracts the underlying integer value.
+
+MPD Id Semantics:
+* Unique identifier for each song in playlist
+* Starts from 1, increments for each new song
+* Persists across playlist reordering (unlike positions)
+
+Usage:
+
+@
+status <- MPD.withMPD MPD.status
+let currentId = getStatusIdInt MPD.stSongID status
+-- currentId :: Maybe Int
+@
+
+Pattern Matching:
+The function uses nested pattern matching to safely extract:
+* Connection success -> field presence -> Id extraction
+
+This ensures no runtime errors from invalid MPD responses
+or missing playlist state.
+-}
+getStatusIdInt :: (MPD.Status -> Maybe MPD.Id) -> Either MPD.MPDError MPD.Status -> Maybe Int
+getStatusIdInt item status =
+  case m of
+    Just (MPD.Id int) -> Just int
+    Nothing -> Nothing
+  where
+    m = fromMaybe Nothing $ getStatusField status item
+
+{- | File path extraction functions for current and next songs.
+
+These functions safely extract file paths from MPD responses,
+handling various edge cases and error conditions.
+-}
+
+{- | Get current song file path safely.
+
+Extracts the relative file path for the currently playing song.
+File paths are relative to MPD's configured music directory.
+
+Error Handling:
+* Connection error -> 'Nothing'
+* No current song -> 'Nothing'
+* Valid song -> 'Just path'
+
+The path extraction uses MPD's 'sgFilePath' field and converts
+from MPD's Value type to String using 'MPD.toString'.
+
+Usage in JSON:
+The extracted path appears as "filename" in the JSON output,
+providing clients with direct file access information.
+-}
+maybePathCurrentSong :: MPD.Response (Maybe Song) -> Maybe String
+maybePathCurrentSong cs =
+  case cs of
+    Left _ -> Nothing
+    Right Nothing -> Nothing
+    Right (Just song) -> Just $ MPD.toString $ MPD.sgFilePath song
+
+{- | Get next song file path from playlist query.
+
+Extracts the file path for the next song in the playlist.
+This function is more complex due to playlist query semantics.
+
+Expected Input:
+The function expects the result of a playlist query for exactly
+one song (the next song). This is typically obtained by querying
+MPD with the next song position.
+
+Edge Cases:
+* Connection error -> 'Nothing'
+* Empty playlist result -> 'Nothing'
+* Multiple songs returned -> 'Nothing' (unexpected)
+* Single song -> 'Just path'
+
+The multiple songs case should not happen in normal operation,
+but the function handles it defensively by returning 'Nothing'
+rather than picking an arbitrary song.
+
+Playlist Query Context:
+This function is designed to work with:
+@
+MPD.playlistInfo (Just nextPosition)
+@
+which should return exactly one song if the next position is valid.
+-}
+maybePathNextPlaylistSong :: MPD.Response [Song] -> Maybe String
+maybePathNextPlaylistSong (Left _) = Nothing
+maybePathNextPlaylistSong (Right []) = Nothing
+maybePathNextPlaylistSong (Right (_:_:_)) = Nothing  -- Multiple songs unexpected
+maybePathNextPlaylistSong (Right [s]) = Just $ MPD.toString $ MPD.sgFilePath s
+
+{- | String conversion utilities for MPD Value types.
+
+These functions handle the conversion from MPD's internal Value
+representation to Haskell strings, supporting both single and
+multi-value tag scenarios.
+-}
+
+{- | Convert single MPD Value to String.
+
+Simple conversion function that uses MPD's provided 'toString'
+function to convert a Value to String within a Maybe context.
+
+MPD Value Types:
+MPD's Value type can represent various string encodings
+internally, but 'toString' provides a clean String interface
+regardless of the underlying representation.
+
+Usage:
+@
+tag <- MPD.sgGetTag Artist song
+let artistString = singleValueToString (listToMaybe tag)
+@
+
+This is typically used for single-value tags where only
+the first value is relevant.
+-}
+singleValueToString :: Maybe MPD.Value -> Maybe String
+singleValueToString (Just x) = Just (MPD.toString x)
+singleValueToString Nothing = Nothing
+
+{- | Convert multiple MPD Values to String list.
+
+Handles multi-value tags by converting all values to strings
+and returning them as a list.
+
+Multi-Value Tag Handling:
+Some MPD tags can contain multiple values, particularly:
+* Artist (for collaborations)
+* Genre (for genre mixing)
+* Performer (for classical music)
+
+Order Correction:
+MPD returns multi-value tags in reverse order compared to
+their original specification. The function corrects this by
+applying 'reverse' to restore the intended order.
+
+Example:
+If a file has artist tag "Artist1; Artist2; Artist3",
+MPD returns ["Artist3", "Artist2", "Artist1"],
+but this function returns ["Artist1", "Artist2", "Artist3"].
+
+Performance:
+Uses 'map MPD.toString' for efficient bulk conversion,
+then 'reverse' to fix ordering. This is more efficient
+than individual conversions.
+-}
+multiValueToString :: Maybe [MPD.Value] -> Maybe [String]
+multiValueToString (Just x) = Just $ reverse $ map MPD.toString x
+multiValueToString Nothing = Nothing
