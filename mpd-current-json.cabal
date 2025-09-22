@@ -1,4 +1,4 @@
-cabal-version:      3.0
+cabal-version:      3.8
 name:               mpd-current-json
 -- The package version.
 -- See the Haskell package versioning policy (PVP) for standards
@@ -44,7 +44,12 @@ library
                   , aeson-pretty == 0.8.*
                   , bytestring >=0.11 && <0.13
     hs-source-dirs: lib
-    default-language: Haskell2010
+    default-language: GHC2021
+    default-extensions: LambdaCase
+                      , NoFieldSelectors
+                      , OverloadedRecordDot
+                      , OverloadedStrings
+                      , StrictData
 
 executable mpd-current-json
     main-is:          Main.hs
@@ -68,7 +73,12 @@ executable mpd-current-json
 
     -- Directories containing source files.
     hs-source-dirs:   src
-    default-language: Haskell2010
+    default-language: GHC2021
+    default-extensions: LambdaCase
+                      , NoFieldSelectors
+                      , OverloadedRecordDot
+                      , OverloadedStrings
+                      , StrictData
 
     -- [[https://kowainik.github.io/posts/2019-02-06-style-guide#ghc-options][Haskell Style Guide :: Kowainik]]
     ghc-options:    -Wall
