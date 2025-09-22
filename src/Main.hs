@@ -9,16 +9,12 @@ import MPD.Current.JSON.Builders
 import           MPD.Current.JSON.JSON ()  -- instances
 import MPD.Current.JSON.Types ( MPDState(..) )
 import MPD.Current.JSON.Parse
-    ( SongQuery(QueryNext, QueryCurrent),
-      getAllTags,
-      getStatusFieldElement )
 import qualified Network.MPD as MPD
 import Options
-    ( Opts(optVersion, optNext, optHost, optPort, optPass),
+    ( execParser,
       NextSongFlag(IncludeNextSong, NoNextSong, OnlyNextSong),
-      optsParserInfo,
-      execParser )
-
+      Opts(..),
+      optsParserInfo )
 import Data.Aeson ( object, KeyValue((.=)), ToJSON(toJSON) )
 import Data.Aeson.Encode.Pretty
     ( defConfig,
@@ -51,8 +47,8 @@ main = do
 
   let mpdState = buildMPDState opts currentSong nextSong status
 
-  let finalJson = case optNext opts of
-        OnlyNextSong -> object ["tags" .= mpdNextTags mpdState]
+  let finalJson = case opts.optNext of
+        OnlyNextSong -> object ["tags" .= mpdState.mpdNextTags]
         _ -> toJSON mpdState
 
   C.putStrLn $ encodePretty' customEncodeConf finalJson
@@ -92,19 +88,21 @@ customEncodeConf = defConfig
  , confIndent = Spaces 2
  }
 
-
-
 -- | Main builder function that creates the complete state
-buildMPDState :: Opts -> MPD.Response (Maybe MPD.Song) -> MPD.Response [MPD.Song]
-              -> MPD.Response MPD.Status -> MPDState
+buildMPDState
+  :: Opts
+  -> CurrentSong
+  -> NextSong
+  -> MPD.Response MPD.Status
+  -> MPDState
 buildMPDState opts currentSong nextSong status = MPDState
   { mpdFiles = buildFileInfo currentSong nextSong
   , mpdStatus = buildPlayerStatus status
   , mpdPlaylist = buildPlaylistInfo status
   , mpdTags = getAllTags QueryCurrent currentSong
-  , mpdNextTags = case optNext opts of
-      NoNextSong -> Nothing
-      OnlyNextSong -> Just (getAllTags QueryNext nextSong)
+  , mpdNextTags = case opts.optNext of
+      NoNextSong      -> Nothing
+      OnlyNextSong    -> Just (getAllTags QueryNext nextSong)
       IncludeNextSong -> Just (getAllTags QueryNext nextSong)
   }
 

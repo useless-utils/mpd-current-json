@@ -45,16 +45,16 @@ buildPlayerStatus st = Status
 
 buildPlaylistInfo :: MPD.Response MPD.Status -> PlaylistInfo
 buildPlaylistInfo st = PlaylistInfo
-  { piPosition = getStatusFieldElement st MPD.stSongPos
+  { piPosition     = getStatusFieldElement st MPD.stSongPos
   , piNextPosition = getStatusFieldElement st MPD.stNextSongPos
-  , piId = getStatusIdInt MPD.stSongID st
-  , piNextId = getStatusIdInt MPD.stNextSongID st
-  , piLength = fromIntegral <$> getStatusField st MPD.stPlaylistLength
+  , piId           = getStatusIdInt MPD.stSongID st
+  , piNextId       = getStatusIdInt MPD.stNextSongID st
+  , piLength       = fromIntegral <$> getStatusField st MPD.stPlaylistLength
   }
 
 buildFileInfo :: MPD.Response (Maybe MPD.Song) -> MPD.Response [MPD.Song] -> FileInfo
 buildFileInfo currentSong nextSong = FileInfo
   { fiCurrentFile = maybePathCurrentSong currentSong
-  , fiNextFile = maybePathNextPlaylistSong nextSong
+  , fiNextFile    = maybePathNextPlaylistSong nextSong
   }
 
