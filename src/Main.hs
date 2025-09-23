@@ -4,10 +4,9 @@
 module Main ( main ) where
 
 
+import MPD.Current.JSON.Types
 import MPD.Current.JSON.Builders
-    ( buildPlayerStatus, buildPlaylistInfo, buildFileInfo )
 import           MPD.Current.JSON.JSON ()  -- instances
-import MPD.Current.JSON.Types ( MPDState(..) )
 import MPD.Current.JSON.Parse
 import qualified Network.MPD as MPD
 import Options
@@ -23,8 +22,9 @@ import Data.Aeson.Encode.Pretty
       Config(confIndent, confCompare),
       Indent(Spaces) )
 import qualified Data.ByteString.Lazy.Char8 as C
-import System.Exit ( exitSuccess )
+import System.Exit
 import Version ( versionStr )
+import Data.Either
 
 
 {- | Where the program connects to MPD and uses the helper functions to
@@ -39,19 +39,40 @@ main = do
   optsExecVersion opts
 
   let withMpdOpts = MPD.withMPDEx opts.optHost opts.optPort opts.optPass
+  responseCurrentSong <- withMpdOpts MPD.currentSong
+  responseStatus <- withMpdOpts MPD.status
+  let nextPos = fromResponseStatusFieldElement responseStatus MPD.stNextSongPos
+  responseNextSong <- withMpdOpts $ MPD.playlistInfo nextPos
 
-  currentSong <- withMpdOpts MPD.currentSong
-  status <- withMpdOpts MPD.status
-  let nextPos = getStatusFieldElement status MPD.stNextSongPos
-  nextSong <- withMpdOpts $ MPD.playlistInfo nextPos
+  case (responseCurrentSong, responseStatus, responseNextSong) of
+    (Right (Just cs), Right status, Right [ns]) ->
+      -- handle edge case where next song is the same as current
+      let opts' = if cs == ns
+                  then opts {optNext = NoNextSong}
+                  else opts
+      in printEncoded opts' cs ns status
 
-  let mpdState = buildMPDState opts currentSong nextSong status
+    -- something tells me that exceptions are thrown before these get reached
+    (Left cs, _, _) -> do
+      putStrLn "[MPD-ERROR] Couldn't get current song."
+      print cs
+      exitFailure
+    (_, Left status, _) -> do
+      putStrLn "[MPD-ERROR] Couldn't get MPD status info."
+      print status
+      exitFailure
+    (Right Nothing, _, _) -> do
+      putStrLn "No current song."
+      exitFailure
+    (_, _, _) -> die "Couldn't get enough information from MPD."
 
-  let finalJson = case opts.optNext of
-        OnlyNextSong -> object ["tags" .= mpdState.mpdNextTags]
-        _ -> toJSON mpdState
-
-  C.putStrLn $ encodePretty' customEncodeConf finalJson
+printEncoded :: Opts -> MPD.Song -> MPD.Song -> MPD.Status -> IO ()
+printEncoded opts cs ns status =
+  let mpdState = currentMPDState opts cs ns status
+      finalJson = case opts.optNext of
+                    OnlyNextSong -> object ["tags" .= mpdState.mpdNextTags]
+                    _ -> toJSON mpdState
+  in C.putStrLn $ encodePretty' customEncodeConf finalJson
 
 customEncodeConf :: Config
 customEncodeConf = defConfig
@@ -89,24 +110,21 @@ customEncodeConf = defConfig
  }
 
 -- | Main builder function that creates the complete state
-buildMPDState
-  :: Opts
-  -> CurrentSong
-  -> NextSong
-  -> MPD.Response MPD.Status
-  -> MPDState
-buildMPDState opts currentSong nextSong status = MPDState
-  { mpdFiles = buildFileInfo currentSong nextSong
-  , mpdStatus = buildPlayerStatus status
-  , mpdPlaylist = buildPlaylistInfo status
-  , mpdTags = getTags QueryCurrent currentSong
+currentMPDState :: Opts -> MPD.Song -> MPD.Song -> MPD.Status -> State
+currentMPDState opts currentSong nextSong status =
+  State
+  { mpdFiles = currentFile currentSong nextSong
+  , mpdStatus = status
+  , mpdPlaylist = currentPlaylist status
+  , mpdTags = getTags currentSong
   , mpdNextTags = case opts.optNext of
       NoNextSong      -> Nothing
-      OnlyNextSong    -> Just (getTags QueryNext nextSong)
-      IncludeNextSong -> Just (getTags QueryNext nextSong)
+      OnlyNextSong    -> Just (getTags nextSong)
+      IncludeNextSong -> Just (getTags nextSong)
   }
 
 optsExecVersion :: Opts -> IO ()
-optsExecVersion opts | opts.optVersion = do putStrLn versionStr
-                                            exitSuccess
-                     | otherwise = pure ()
+optsExecVersion opts
+  | opts.optVersion = do putStrLn versionStr
+                         exitSuccess
+  | otherwise = pure ()

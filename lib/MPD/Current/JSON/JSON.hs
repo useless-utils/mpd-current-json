@@ -1,13 +1,26 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
+
 
 module MPD.Current.JSON.JSON where
 
-import MPD.Current.JSON.Types
+import MPD.Current.JSON.Types (TagField(..))
+import MPD.Current.JSON.Types qualified as Current
+import MPD.Current.JSON.Parse
 import qualified Network.MPD as MPD
 
 import qualified Data.Aeson.KeyMap as KM
 import           Data.Aeson.Types
 import           Data.Maybe
+import           Data.Kind
+import GHC.TypeLits
+import Data.Proxy
+import Text.Read
+import Text.Printf
+
 
 {- | Helper function for creating an JSON 'Data.Aeson.object' where
 'Data.Maybe.catMaybes' won't include items from the @[Maybe
@@ -50,8 +63,28 @@ instance (ToJSON a) => MaybeToJSON [a] where
   maybeToJSON [] = Nothing
   maybeToJSON xs = Just (toJSON xs)
 
+instance MaybeToJSON MPD.PlaybackState where
+  maybeToJSON MPD.Playing = Just "playing"
+  maybeToJSON MPD.Paused  = Just "pause"
+  maybeToJSON MPD.Stopped = Just "stopped"
 
-instance ToJSON Tags where
+instance MaybeToJSON (Int, Int, Int) where
+  maybeToJSON = Just . toJSON
+
+instance MaybeToJSON MPD.Seconds where
+  maybeToJSON = Just . toJSON
+
+instance MaybeToJSON MPD.Id where
+  maybeToJSON (MPD.Id i) = Just . toJSON $ i
+
+instance ToJSON MPD.Id where
+  toJSON (MPD.Id i) = toJSON i
+
+instance ToJSON MPD.Path where
+  toJSON p = toJSON $ MPD.toString p
+
+
+instance ToJSON Current.Tags where
   toJSON tag = objectMaybes
     [ "artist"                     .=? tag.artist
     , "artist_sort"                .=? tag.artistSort
@@ -81,42 +114,62 @@ instance ToJSON Tags where
     , "musicbrainz_workid"         .=? tag.musicbrainzWorkId
     ]
 
-instance ToJSON Status where
+instance ToJSON Current.Status where
   toJSON ps = objectMaybes
-    [ "state"           .=? ps.psState
-    , "repeat"          .=? ps.psRepeat
-    , "random"          .=? ps.psRandom
-    , "single"          .=? ps.psSingle
-    , "consume"         .=? ps.psConsume
-    , "duration"        .=? ps.psDuration
-    , "elapsed"         .=? ps.psElapsed
-    , "elapsed_percent" .=? ps.psElapsedPercent
-    , "volume"          .=? ps.psVolume
-    , "audio_format"    .=? ps.psAudioFormat
-    , "bitrate"         .=? ps.psBitrate
-    , "crossfade"       .=? ps.psCrossfade
-    , "mixramp_db"      .=? ps.psMixRampDb
-    , "mixramp_delay"   .=? ps.psMixRampDelay
-    , "updating_db"     .=? ps.psUpdatingDb
-    , "error"           .=? ps.psError
+    [ "state"           .=? ps.state
+    , "repeat"          .=? ps.repeat
+    , "random"          .=? ps.random
+    , "single"          .=? ps.single
+    , "consume"         .=? ps.consume
+    , "duration"        .=? ps.duration
+    , "elapsed"         .=? ps.elapsed
+    , "elapsed_percent" .=? ps.elapsedPercent
+    , "volume"          .=? ps.volume
+    , "audio_format"    .=? ps.audioFormat
+    , "bitrate"         .=? ps.bitrate
+    , "crossfade"       .=? ps.crossfade
+    , "mixramp_db"      .=? ps.mixRampDb
+    , "mixramp_delay"   .=? ps.mixRampDelay
+    , "updating_db"     .=? ps.updatingDb
+    , "error"           .=? ps.error
     ]
 
-instance ToJSON PlaylistInfo where
+instance ToJSON MPD.Status where
+  toJSON st = objectMaybes
+    [ "state"           .=? st.stState
+    , "repeat"          .=? st.stRepeat
+    , "random"          .=? st.stRandom
+    , "single"          .=? st.stSingle
+    , "consume"         .=? st.stConsume
+    , "duration"        .=? fmap snd st.stTime
+    , "elapsed"         .=? fmap fst st.stTime
+    , "elapsed_percent" .=? calcElapsedPercent st.stTime
+    , "volume"          .=? fmap toInteger st.stVolume
+    , "audio_format"    .=? st.stAudio
+    , "bitrate"         .=? st.stBitrate
+    , "crossfade"       .=? st.stXFadeWidth
+    , "mixramp_db"      .=? st.stMixRampdB
+    , "mixramp_delay"   .=? st.stMixRampDelay
+    , "updating_db"     .=? st.stUpdatingDb
+    , "error"           .=? st.stError
+    ]
+
+instance ToJSON Current.Playlist where
   toJSON pi = objectMaybes
-    [ "position"      .=? pi.piPosition
-    , "next_position" .=? pi.piNextPosition
-    , "id"            .=? pi.piId
-    , "next_id"       .=? pi.piNextId
-    , "length"        .=? pi.piLength
+    [ "position"      .=? pi.position
+    , "next_position" .=? pi.nextPosition
+    , "id"            .=? pi.id
+    , "next_id"       .=? pi.nextId
+    , "length"        .=? pi.length
     ]
 
-instance ToJSON FileInfo where
+instance ToJSON Current.File where
   toJSON fi = objectMaybes
-    [ "filename"      .=? fi.fiCurrentFile
-    , "next_filename" .=? fi.fiNextFile
+    [ "filename"      .=? fi.currentFile
+    , "next_filename" .=? fi.nextFile
     ]
 
-instance ToJSON MPDState where
+instance ToJSON Current.State where
   toJSON state = object $ concat
     [ objectPairs (toJSON state.mpdFiles)
     , [ "status"   .= toJSON state.mpdStatus
@@ -130,3 +183,12 @@ instance ToJSON MPDState where
     where
       objectPairs (Object obj) = [(k, v) | (k, v) <- KM.toList obj]
       objectPairs _ = []
+
+
+calcElapsedPercent :: Maybe (MPD.FractionalSeconds, MPD.FractionalSeconds) -> Maybe Double
+calcElapsedPercent Nothing = Nothing
+calcElapsedPercent (Just (elapsed, duration)) = do
+  let elapsedPercent = (elapsed / duration) * 100
+  if duration > 0
+    then readMaybe $ printf "%02.2f" elapsedPercent :: Maybe Double
+    else Nothing

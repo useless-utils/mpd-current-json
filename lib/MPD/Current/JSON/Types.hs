@@ -46,46 +46,45 @@ data Tags = Tags
   deriving (Show, Eq, Generic)
 
 data Status = Status
-  { psState          :: !(Maybe String)
-  , psRepeat         :: !Bool
-  , psRandom         :: !Bool
-  , psSingle         :: !Bool
-  , psConsume        :: !Bool
-  , psDuration       :: !(Maybe MPD.FractionalSeconds)  -- Double
-  , psElapsed        :: !(Maybe MPD.FractionalSeconds)
-  , psElapsedPercent :: !(Maybe Double)
-  , psVolume         :: !(Maybe Int)
-  , psAudioFormat    :: !(Maybe (Int, Int, Int))
-  , psBitrate        :: !(Maybe Int)
-  , psCrossfade      :: !(Maybe Int)
-  , psMixRampDb      :: !(Maybe Double)
-  , psMixRampDelay   :: !(Maybe Double)
-  , psUpdatingDb     :: !(Maybe Bool)
-  , psError          :: !(Maybe String)
+  { state          :: !(Maybe String)
+  , repeat         :: !Bool
+  , random         :: !Bool
+  , single         :: !Bool
+  , consume        :: !Bool
+  , duration       :: !(Maybe MPD.FractionalSeconds)  -- Double
+  , elapsed        :: !(Maybe MPD.FractionalSeconds)
+  , elapsedPercent :: !(Maybe Double)
+  , volume         :: !(Maybe Int)
+  , audioFormat    :: !(Maybe (Int, Int, Int))
+  , bitrate        :: !(Maybe Int)
+  , crossfade      :: !(Maybe Int)
+  , mixRampDb      :: !(Maybe Double)
+  , mixRampDelay   :: !(Maybe Double)
+  , updatingDb     :: !(Maybe Bool)
+  , error          :: !(Maybe String)
   }
   deriving (Show, Eq, Generic)
 
-data PlaylistInfo = PlaylistInfo
-  { piPosition     :: !(Maybe MPD.Position)
-  , piNextPosition :: !(Maybe MPD.Position)
-  , piId           :: !(Maybe Int)
-  , piNextId       :: !(Maybe Int)
-  , piLength       :: !(Maybe Int)
+data Playlist = Playlist
+  { position     :: !(Maybe MPD.Position)
+  , nextPosition :: !(Maybe MPD.Position)
+  , id           :: !(Maybe MPD.Id)
+  , nextId       :: !(Maybe MPD.Id)
+  , length       :: !Int
   }
   deriving (Show, Eq, Generic)
 
--- | File Information
-data FileInfo = FileInfo
-  { fiCurrentFile :: !(Maybe String)  -- ^ current song file path
-  , fiNextFile    :: !(Maybe String)  -- ^ next song file path
+data File = File
+  { currentFile :: !(Maybe MPD.Path)  -- ^ current song file path
+  , nextFile    :: !(Maybe MPD.Path)  -- ^ next song file path
   }
   deriving (Show, Eq, Generic)
 
 -- | Complete MPD State
-data MPDState = MPDState
-  { mpdFiles    :: !FileInfo
-  , mpdStatus   :: !Status
-  , mpdPlaylist :: !PlaylistInfo
+data State = State
+  { mpdFiles    :: !File
+  , mpdStatus   :: !MPD.Status
+  , mpdPlaylist :: !Playlist
   , mpdTags     :: !Tags
   , mpdNextTags :: !(Maybe Tags)
   }
