@@ -32,11 +32,23 @@ instance OptionalToJSON TagField where
   optionalToJSON (MultiTagField ml) = toJSON <$> ml
 
 instance (ToJSON a) => OptionalToJSON (Maybe a) where
-  optionalToJSON (Just a) = Just (toJSON a)  
+  optionalToJSON (Just a) = Just (toJSON a)
   optionalToJSON Nothing = Nothing
 
 instance OptionalToJSON Bool where
   optionalToJSON = Just . toJSON
+
+-- Numbers: Always included
+instance OptionalToJSON Int where
+  optionalToJSON = Just . toJSON
+
+instance OptionalToJSON Double where
+  optionalToJSON = Just . toJSON
+
+-- Lists: Empty lists omitted
+instance (ToJSON a) => OptionalToJSON [a] where
+  optionalToJSON [] = Nothing
+  optionalToJSON xs = Just (toJSON xs)
 
 
 instance ToJSON Tags where
@@ -100,7 +112,7 @@ instance ToJSON PlaylistInfo where
 
 instance ToJSON FileInfo where
   toJSON fi = objectMaybes
-    [ "filename" .=? fi.fiCurrentFile
+    [ "filename"      .=? fi.fiCurrentFile
     , "next_filename" .=? fi.fiNextFile
     ]
 
