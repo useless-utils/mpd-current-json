@@ -99,11 +99,11 @@ buildMPDState opts currentSong nextSong status = MPDState
   { mpdFiles = buildFileInfo currentSong nextSong
   , mpdStatus = buildPlayerStatus status
   , mpdPlaylist = buildPlaylistInfo status
-  , mpdTags = getAllTags QueryCurrent currentSong
+  , mpdTags = getTags QueryCurrent currentSong
   , mpdNextTags = case opts.optNext of
       NoNextSong      -> Nothing
-      OnlyNextSong    -> Just (getAllTags QueryNext nextSong)
-      IncludeNextSong -> Just (getAllTags QueryNext nextSong)
+      OnlyNextSong    -> Just (getTags QueryNext nextSong)
+      IncludeNextSong -> Just (getTags QueryNext nextSong)
   }
 
 optsExecVersion :: Opts -> IO ()

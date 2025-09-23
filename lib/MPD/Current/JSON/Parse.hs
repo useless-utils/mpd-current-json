@@ -28,8 +28,8 @@ type CurrentSong = Response (SongData 'Current)
 type NextSong = Response (SongData 'Next)
 
 
-getAllTags :: SongQuery s -> Response (SongData s) -> Tags
-getAllTags query s            = Tags
+getTags :: SongQuery s -> Response (SongData s) -> Tags
+getTags query s            = Tags
   { artist                    = getTag query Artist                     s
   , artistSort                = getTag query ArtistSort                 s
   , album                     = getTag query Album                      s

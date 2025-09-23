@@ -4,8 +4,8 @@ module MPD.Current.JSON.Builders where
 
 import MPD.Current.JSON.Types
 import MPD.Current.JSON.Parse
-
 import Network.MPD qualified as MPD
+
 import Data.Maybe
 import Text.Printf
 import Text.Read
