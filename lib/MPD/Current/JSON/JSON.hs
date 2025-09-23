@@ -19,36 +19,36 @@ the output that would contain @null@ otherwise.
 objectMaybes :: [Maybe Pair] -> Value
 objectMaybes = object . catMaybes
 
-(.=?) :: (OptionalToJSON a) => Key -> a -> Maybe Pair
-key .=? value = (key .=) <$> optionalToJSON value
+(.=?) :: (MaybeToJSON a) => Key -> a -> Maybe Pair
+key .=? value = (key .=) <$> maybeToJSON value
 infixr 8 .=?
 
 -- | Type class for optional JSON serialization
-class OptionalToJSON a where
-  optionalToJSON :: a -> Maybe Value
+class MaybeToJSON a where
+  maybeToJSON :: a -> Maybe Value
 
-instance OptionalToJSON TagField where
-  optionalToJSON (SingleTagField ms) = toJSON <$> ms
-  optionalToJSON (MultiTagField ml) = toJSON <$> ml
+instance MaybeToJSON TagField where
+  maybeToJSON (SingleTagField ms) = toJSON <$> ms
+  maybeToJSON (MultiTagField ml) = toJSON <$> ml
 
-instance (ToJSON a) => OptionalToJSON (Maybe a) where
-  optionalToJSON (Just a) = Just (toJSON a)
-  optionalToJSON Nothing = Nothing
+instance (ToJSON a) => MaybeToJSON (Maybe a) where
+  maybeToJSON (Just a) = Just (toJSON a)
+  maybeToJSON Nothing = Nothing
 
-instance OptionalToJSON Bool where
-  optionalToJSON = Just . toJSON
+instance MaybeToJSON Bool where
+  maybeToJSON = Just . toJSON
 
 -- Numbers: Always included
-instance OptionalToJSON Int where
-  optionalToJSON = Just . toJSON
+instance MaybeToJSON Int where
+  maybeToJSON = Just . toJSON
 
-instance OptionalToJSON Double where
-  optionalToJSON = Just . toJSON
+instance MaybeToJSON Double where
+  maybeToJSON = Just . toJSON
 
 -- Lists: Empty lists omitted
-instance (ToJSON a) => OptionalToJSON [a] where
-  optionalToJSON [] = Nothing
-  optionalToJSON xs = Just (toJSON xs)
+instance (ToJSON a) => MaybeToJSON [a] where
+  maybeToJSON [] = Nothing
+  maybeToJSON xs = Just (toJSON xs)
 
 
 instance ToJSON Tags where
