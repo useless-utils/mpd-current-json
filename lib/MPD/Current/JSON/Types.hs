@@ -1,10 +1,7 @@
-{-# LANGUAGE DeriveGeneric #-}
-
 module MPD.Current.JSON.Types where
 
-
-import           GHC.Generics
-import qualified Network.MPD as MPD
+import GHC.Generics ( Generic )
+import Network.MPD qualified as MPD
 
 
 data TagField = SingleTagField !(Maybe String)

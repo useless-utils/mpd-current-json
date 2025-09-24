@@ -1,3 +1,5 @@
+{-# LANGUAGE DerivingStrategies #-}
+
 module Options
   ( Opts(..)
   , NextSongFlag(..)
@@ -28,7 +30,6 @@ import Options.Applicative
       execParser,
       Parser,
       ParserInfo,
-      infoOption,
       hidden,
       many,
       (<|>) )
@@ -45,12 +46,12 @@ data Opts = Opts  -- ^ Custom data record for storing 'Options.Applicative.Parse
   , optNext    :: NextSongFlag -- ^ Either include in the json or print it alone.
   , optVersion :: Bool
   }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 data NextSongFlag = IncludeNextSong
                   | OnlyNextSong
                   | NoNextSong
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 optsParser :: Parser Opts
 optsParser

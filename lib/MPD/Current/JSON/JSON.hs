@@ -9,17 +9,20 @@ module MPD.Current.JSON.JSON where
 
 import MPD.Current.JSON.Types (TagField(..))
 import MPD.Current.JSON.Types qualified as Current
-import MPD.Current.JSON.Parse
-import qualified Network.MPD as MPD
+import MPD.Current.JSON.Parse ()
+import Network.MPD qualified as MPD
 
-import qualified Data.Aeson.KeyMap as KM
-import           Data.Aeson.Types
-import           Data.Maybe
-import           Data.Kind
-import GHC.TypeLits
-import Data.Proxy
-import Text.Read
-import Text.Printf
+import Data.Aeson.KeyMap qualified as KM
+import Data.Aeson.Types
+    ( Key,
+      object,
+      Pair,
+      Value(Object),
+      KeyValue((.=)),
+      ToJSON(toJSON) )
+import Data.Maybe ( catMaybes )
+import Text.Read ( readMaybe )
+import Text.Printf ( printf )
 
 
 {- | Helper function for creating an JSON 'Data.Aeson.object' where
@@ -153,6 +156,14 @@ instance ToJSON MPD.Status where
     , "updating_db"     .=? st.stUpdatingDb
     , "error"           .=? st.stError
     ]
+    where
+      calcElapsedPercent :: Maybe (MPD.FractionalSeconds, MPD.FractionalSeconds) -> Maybe Double
+      calcElapsedPercent Nothing = Nothing
+      calcElapsedPercent (Just (elapsed, duration)) = do
+        let elapsedPercent = (elapsed / duration) * 100
+        if duration > 0
+          then readMaybe $ printf "%02.2f" elapsedPercent :: Maybe Double
+          else Nothing
 
 instance ToJSON Current.Playlist where
   toJSON pi = objectMaybes
@@ -184,11 +195,3 @@ instance ToJSON Current.State where
       objectPairs (Object obj) = [(k, v) | (k, v) <- KM.toList obj]
       objectPairs _ = []
 
-
-calcElapsedPercent :: Maybe (MPD.FractionalSeconds, MPD.FractionalSeconds) -> Maybe Double
-calcElapsedPercent Nothing = Nothing
-calcElapsedPercent (Just (elapsed, duration)) = do
-  let elapsedPercent = (elapsed / duration) * 100
-  if duration > 0
-    then readMaybe $ printf "%02.2f" elapsedPercent :: Maybe Double
-    else Nothing
