@@ -7,8 +7,7 @@ module Main ( main ) where
 import MPD.Current.JSON.Types ( State(..) )
 import MPD.Current.JSON.Builders ( currentPlaylist, currentFile )
 import MPD.Current.JSON.JSON ()  -- instances
-import MPD.Current.JSON.Parse
-    ( getTags, fromResponseStatusFieldElement )
+import MPD.Current.JSON.Parse ( getTags )
 import Network.MPD qualified as MPD
 import Options
     ( execParser,
@@ -22,31 +21,27 @@ import Data.Aeson.Encode.Pretty
     ( defConfig,
       encodePretty',
       keyOrder,
-      Config(confIndent, confCompare),
+      Config(..),
       Indent(Spaces) )
 import Data.ByteString.Lazy.Char8 qualified as C
-import System.Exit ( die, exitFailure, exitSuccess )
+import System.Exit ( die, exitSuccess )
 
 
-{- | Where the program connects to MPD and uses the helper functions to
-extract values, organize them into a list of key/value pairs, make
-them a 'Data.Aeson.Value' using 'Data.Aeson.object', then encode it to
-a conventional JSON @ByteString@ with
-'Data.Aeson.Encode.Pretty.encodePretty' for the pretty-print version.
--}
 main :: IO ()
 main = do
   opts <- execParser optsParserInfo
   optsExecVersion opts
 
   let withMpdOpts = MPD.withMPDEx opts.optHost opts.optPort opts.optPass
-  responseCurrentSong <- withMpdOpts MPD.currentSong
-  responseStatus <- withMpdOpts MPD.status
-  let nextPos = fromResponseStatusFieldElement responseStatus MPD.stNextSongPos
-  responseNextSong <- withMpdOpts $ MPD.playlistInfo nextPos
+  response <- withMpdOpts $ do
+    cs <- MPD.currentSong
+    st <- MPD.status
+    let nPos = st.stNextSongPos
+    ns <- MPD.playlistInfo nPos
+    pure (cs, st, ns)
 
-  case (responseCurrentSong, responseStatus, responseNextSong) of
-    (Right (Just cs), Right status, Right [ns]) ->
+  case response of
+    Right (Just cs, status, [ns]) ->
       -- handle edge case where next song is the same as current
       let opts' = if cs == ns
                   then opts {optNext = NoNextSong}
@@ -54,18 +49,7 @@ main = do
       in printEncoded opts' cs ns status
 
     -- something tells me that exceptions are thrown before these get reached
-    (Left cs, _, _) -> do
-      putStrLn "[MPD-ERROR] Couldn't get current song."
-      print cs
-      exitFailure
-    (_, Left status, _) -> do
-      putStrLn "[MPD-ERROR] Couldn't get MPD status info."
-      print status
-      exitFailure
-    (Right Nothing, _, _) -> do
-      putStrLn "No current song."
-      exitFailure
-    (_, _, _) -> die "Couldn't get enough information from MPD."
+    _ -> die "Couldn't get enough information from MPD."
 
 printEncoded :: Opts -> MPD.Song -> MPD.Song -> MPD.Status -> IO ()
 printEncoded opts cs ns status =
