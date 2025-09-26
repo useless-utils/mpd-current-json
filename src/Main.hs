@@ -5,8 +5,8 @@ module Main ( main ) where
 
 
 import MPD.Current.JSON.Types ( State(..) )
-import MPD.Current.JSON.Builders ( currentPlaylist, currentFile )
-import MPD.Current.JSON.JSON ()  -- instances
+import MPD.Current.JSON.Builders
+    ( currentStatus, currentPlaylist, currentFile )
 import MPD.Current.JSON.Parse ( getTags )
 import Network.MPD qualified as MPD
 import Options
@@ -99,7 +99,7 @@ currentMPDState :: Opts -> MPD.Song -> MPD.Song -> MPD.Status -> State
 currentMPDState opts currentSong nextSong status =
   State
   { mpdFiles = currentFile currentSong nextSong
-  , mpdStatus = status
+  , mpdStatus = currentStatus status
   , mpdPlaylist = currentPlaylist status
   , mpdTags = getTags currentSong
   , mpdNextTags = case opts.optNext of

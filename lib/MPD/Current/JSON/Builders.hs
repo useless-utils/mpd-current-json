@@ -1,15 +1,47 @@
-{-# LANGUAGE ImportQualifiedPost #-}
+module MPD.Current.JSON.Builders
+    ( currentStatus
+    , currentPlaylist
+    , currentFile
+    ) where
 
-module MPD.Current.JSON.Builders where
-
+-- import MPD.Current.JSON.Types
 import MPD.Current.JSON.Types qualified as Current
 import Network.MPD qualified as MPD
-
-import Data.ByteString qualified as B
+import Text.Read ( readMaybe )
+import Text.Printf ( printf )
+import GHC.Num
 
 -- currentMPDState is in Main
 
--- buildPlaylistInfo :: MPD.Status -> PlaylistInfo
+currentStatus :: MPD.Status -> Current.Status
+currentStatus st = Current.Status
+  { Current.state          = st.stState
+  , Current.repeat         = st.stRepeat
+  , Current.random         = st.stRandom
+  , Current.single         = st.stSingle
+  , Current.consume        = st.stConsume
+  , Current.duration       = snd <$> st.stTime
+  , Current.elapsed        = fst <$> st.stTime
+  , Current.elapsedPercent = calcElapsedPercent st.stTime
+  , Current.volume         = fromIntegral <$> st.stVolume
+  , Current.audioFormat    = Just st.stAudio
+  , Current.bitrate        = st.stBitrate
+  , Current.crossfade      = Just . integerToInt $ st.stXFadeWidth
+  , Current.mixRampDb      = Just st.stMixRampdB
+  , Current.mixRampDelay   = Just st.stMixRampDelay
+  , Current.updatingDb     = integerToInt <$> st.stUpdatingDb
+  , Current.error          = st.stError
+  }
+  where
+    calcElapsedPercent :: Maybe (MPD.FractionalSeconds, MPD.FractionalSeconds) -> Maybe Double
+    calcElapsedPercent Nothing = Nothing
+    calcElapsedPercent (Just (elapsed, duration)) = do
+      let elapsedPercent = (elapsed / duration) * 100
+      if duration > 0
+        then readMaybe $ printf "%02.2f" elapsedPercent :: Maybe Double
+        else Nothing
+
+currentPlaylist :: MPD.Status -> Current.Playlist
 currentPlaylist st = Current.Playlist
   { Current.position     = st.stSongPos
   , Current.nextPosition = st.stNextSongPos
@@ -18,7 +50,7 @@ currentPlaylist st = Current.Playlist
   , Current.length       = fromIntegral st.stPlaylistLength
   }
 
--- buildFileInfo :: MPD.Song -> MPD.Song -> FileInfo
+currentFile :: MPD.Song -> MPD.Song -> Current.File
 currentFile cs ns = Current.File
   { Current.currentFile = if null $ MPD.toString cs.sgFilePath
                           then Nothing

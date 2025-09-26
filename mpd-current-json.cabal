@@ -37,7 +37,6 @@ library
     exposed-modules:  MPD.Current.JSON.Parse
                       MPD.Current.JSON.Builders
                       MPD.Current.JSON.Types
-                      MPD.Current.JSON.JSON
     build-depends:  base >=4.16 && <5
                   , libmpd == 0.10.*
                   , aeson == 2.2.*
@@ -50,6 +49,25 @@ library
                       , OverloadedRecordDot
                       , OverloadedStrings
                       , StrictData
+                      , DerivingStrategies
+    ghc-options:    -Wall
+                    -Wcompat
+                    -Widentities
+                    -Wincomplete-uni-patterns
+                    -Wincomplete-record-updates
+                    -Wredundant-constraints
+                    -Wmissing-export-lists
+                    -Wpartial-fields
+                    -Wmissing-deriving-strategies
+                    -Wunused-packages
+                    -fwrite-ide-info
+                    -hiedir=.hie
+                    -Wmissing-local-signatures
+                    -Wincomplete-patterns
+                    -Woverlapping-patterns
+                    -fwarn-incomplete-patterns
+                    -fwarn-tabs
+
 
 executable mpd-current-json
     main-is:          Main.hs
@@ -79,6 +97,7 @@ executable mpd-current-json
                       , OverloadedRecordDot
                       , OverloadedStrings
                       , StrictData
+                      , DerivingStrategies
 
     -- [[https://kowainik.github.io/posts/2019-02-06-style-guide#ghc-options][Haskell Style Guide :: Kowainik]]
     ghc-options:    -Wall

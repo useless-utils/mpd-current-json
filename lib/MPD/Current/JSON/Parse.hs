@@ -3,17 +3,16 @@
 {-# LANGUAGE TypeFamilies #-}
 
 
-module MPD.Current.JSON.Parse where
+module MPD.Current.JSON.Parse
+    ( getTags
+    ) where
 
-import MPD.Current.JSON.Types
-    ( Tags(..), TagField(..) )
-
+import MPD.Current.JSON.Types ( Tags(..), TagField(..) )
 import Data.Maybe ( listToMaybe, fromMaybe )
-import           Network.MPD
-  ( Metadata(..), Song, PlaybackState(Stopped, Playing, Paused), Response )
+import Network.MPD ( Metadata(..) )
 import qualified Network.MPD as MPD
 
-
+getTags :: MPD.Song -> Tags
 getTags song = Tags
   { artist                    = getTag Artist                     song
   , artistSort                = getTag ArtistSort                 song
@@ -43,6 +42,7 @@ getTags song = Tags
   , musicbrainzWorkId         = getTag MUSICBRAINZ_WORKID         song
   }
 
+getTag :: Metadata -> MPD.Song -> TagField
 getTag tag song = tagSingleOrList (MPD.sgGetTag tag song)
   where
     tagSingleOrList :: Maybe [MPD.Value] -> TagField
