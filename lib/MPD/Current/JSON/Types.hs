@@ -1,14 +1,9 @@
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
-
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -22,7 +17,6 @@ module MPD.Current.JSON.Types
     , State(..)
     ) where
 
-import GHC.Generics ( Generic )
 import Network.MPD qualified as MPD
 
 import Data.Aeson.KeyMap qualified as KM
@@ -30,14 +24,15 @@ import Data.Aeson.Types
 import Data.Maybe ( catMaybes )
 
 import Deriving.Aeson
-import Data.List
+import Data.List qualified as L
 import Data.Char
+import Control.Applicative
 
 data MPDCurrentJSONTag
 
 instance StringModifier MPDCurrentJSONTag where
   getStringModifier s =
-    case stripPrefix "musicbrainz" s of
+    case L.stripPrefix "musicbrainz" s of
       Just xs -> "musicbrainz_" ++ map toLower xs
       Nothing -> camelTo2 '_' s
 
@@ -45,12 +40,12 @@ data MPDCurrentJSONStatus
 
 instance StringModifier MPDCurrentJSONStatus where
   getStringModifier s =
-    case stripPrefix "musicbrainz" s of
+    case L.stripPrefix "musicbrainz" s of
       Just xs -> "musicbrainz_" ++ map toLower xs
       Nothing -> camelTo2 '_' s
 
-data TagField = SingleTagField !(Maybe String)
-              | MultiTagField !(Maybe [String])
+data TagField = SingleTagField !String
+              | MultiTagField ![String]
   deriving stock (Show, Eq, Generic)
 
 {- | Store the parsed output of 'getTag'.
@@ -58,32 +53,32 @@ data TagField = SingleTagField !(Maybe String)
 Each field represents a supported MPD tag.
 -}
 data Tags = Tags
-  { artist                    :: !TagField
-  , artistSort                :: !TagField
-  , album                     :: !TagField
-  , albumSort                 :: !TagField
-  , albumArtist               :: !TagField
-  , albumArtistSort           :: !TagField
-  , title                     :: !TagField
-  , track                     :: !TagField
-  , name                      :: !TagField
-  , genre                     :: !TagField
-  , date                      :: !TagField
-  , originalDate              :: !TagField
-  , composer                  :: !TagField
-  , performer                 :: !TagField
-  , conductor                 :: !TagField
-  , work                      :: !TagField
-  , grouping                  :: !TagField
-  , comment                   :: !TagField
-  , disc                      :: !TagField
-  , label                     :: !TagField
-  , musicbrainzArtistId       :: !TagField
-  , musicbrainzAlbumId        :: !TagField
-  , musicbrainzAlbumartistId  :: !TagField
-  , musicbrainzTrackId        :: !TagField
-  , musicbrainzReleasetrackId :: !TagField
-  , musicbrainzWorkId         :: !TagField
+  { artist                    :: !(Maybe TagField)
+  , artistSort                :: !(Maybe TagField)
+  , album                     :: !(Maybe TagField)
+  , albumSort                 :: !(Maybe TagField)
+  , albumArtist               :: !(Maybe TagField)
+  , albumArtistSort           :: !(Maybe TagField)
+  , title                     :: !(Maybe TagField)
+  , track                     :: !(Maybe TagField)
+  , name                      :: !(Maybe TagField)
+  , genre                     :: !(Maybe TagField)
+  , date                      :: !(Maybe TagField)
+  , originalDate              :: !(Maybe TagField)
+  , composer                  :: !(Maybe TagField)
+  , performer                 :: !(Maybe TagField)
+  , conductor                 :: !(Maybe TagField)
+  , work                      :: !(Maybe TagField)
+  , grouping                  :: !(Maybe TagField)
+  , comment                   :: !(Maybe TagField)
+  , disc                      :: !(Maybe TagField)
+  , label                     :: !(Maybe TagField)
+  , musicbrainzArtistId       :: !(Maybe TagField)
+  , musicbrainzAlbumId        :: !(Maybe TagField)
+  , musicbrainzAlbumartistId  :: !(Maybe TagField)
+  , musicbrainzTrackId        :: !(Maybe TagField)
+  , musicbrainzReleasetrackId :: !(Maybe TagField)
+  , musicbrainzWorkId         :: !(Maybe TagField)
   }
   deriving stock (Show, Eq, Generic)
   deriving (ToJSON, FromJSON) via CustomJSON
@@ -93,15 +88,13 @@ data Tags = Tags
 
 instance ToJSON TagField where
   toJSON :: TagField -> Value
-  toJSON (SingleTagField maybeString) = toJSON maybeString
+  toJSON (SingleTagField s) = toJSON s
   toJSON (MultiTagField maybeList) = toJSON maybeList
 
-  omitField :: TagField -> Bool
-  omitField (SingleTagField Nothing) = True
-  omitField (MultiTagField Nothing) = True
-  omitField _ = False
-
-instance FromJSON TagField
+instance FromJSON TagField where
+  parseJSON v =
+        (SingleTagField <$> parseJSON v)
+    <|> (MultiTagField <$> parseJSON v)
 
 
 data Status = Status

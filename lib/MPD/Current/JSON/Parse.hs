@@ -42,20 +42,14 @@ getTags song = Tags
   , musicbrainzWorkId         = getTag MUSICBRAINZ_WORKID         song
   }
 
-getTag :: Metadata -> MPD.Song -> TagField
+getTag :: Metadata -> MPD.Song -> Maybe TagField
 getTag tag song = tagSingleOrList (MPD.sgGetTag tag song)
   where
-    tagSingleOrList :: Maybe [MPD.Value] -> TagField
-    tagSingleOrList val
-      | fmap length val == Just 1
-      = SingleTagField
-        $ singleValueToString
-        $ listToMaybe
-        $ fromMaybe [] val
-      | fmap length val > Just 1
-      = MultiTagField
-        $ multiValueToString val
-      | otherwise = SingleTagField Nothing
+    tagSingleOrList :: Maybe [MPD.Value] -> Maybe TagField
+    tagSingleOrList val = case val of
+      Just [v] -> Just $ SingleTagField $ MPD.toString v
+      Just v -> Just $ MultiTagField $ map MPD.toString v
+      Nothing -> Nothing
 
 
 {- | Convert 'Network.MPD.Value' to @String@ within a @Maybe@ context.
