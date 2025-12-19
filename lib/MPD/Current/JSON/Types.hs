@@ -1,8 +1,17 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
+
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module MPD.Current.JSON.Types
     ( Tags(..)
@@ -18,18 +27,31 @@ import Network.MPD qualified as MPD
 
 import Data.Aeson.KeyMap qualified as KM
 import Data.Aeson.Types
-    ( Key,
-      object,
-      Pair,
-      Value(Object),
-      KeyValue((.=)),
-      ToJSON(toJSON) )
 import Data.Maybe ( catMaybes )
 
+import Deriving.Aeson
+import Data.List
+import Data.Char
+
+data MPDCurrentJSONTag
+
+instance StringModifier MPDCurrentJSONTag where
+  getStringModifier s =
+    case stripPrefix "musicbrainz" s of
+      Just xs -> "musicbrainz_" ++ map toLower xs
+      Nothing -> camelTo2 '_' s
+
+data MPDCurrentJSONStatus
+
+instance StringModifier MPDCurrentJSONStatus where
+  getStringModifier s =
+    case stripPrefix "musicbrainz" s of
+      Just xs -> "musicbrainz_" ++ map toLower xs
+      Nothing -> camelTo2 '_' s
 
 data TagField = SingleTagField !(Maybe String)
               | MultiTagField !(Maybe [String])
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Generic)
 
 {- | Store the parsed output of 'getTag'.
 
@@ -64,6 +86,23 @@ data Tags = Tags
   , musicbrainzWorkId         :: !TagField
   }
   deriving stock (Show, Eq, Generic)
+  deriving (ToJSON, FromJSON) via CustomJSON
+  '[ FieldLabelModifier '[ MPDCurrentJSONTag ]
+   , OmitNothingFields
+   ] Tags
+
+instance ToJSON TagField where
+  toJSON :: TagField -> Value
+  toJSON (SingleTagField maybeString) = toJSON maybeString
+  toJSON (MultiTagField maybeList) = toJSON maybeList
+
+  omitField :: TagField -> Bool
+  omitField (SingleTagField Nothing) = True
+  omitField (MultiTagField Nothing) = True
+  omitField _ = False
+
+instance FromJSON TagField
+
 
 data Status = Status
   { state          :: !MPD.PlaybackState
@@ -130,11 +169,6 @@ infixr 8 .=?
 class MaybeToJSON a where
   maybeToJSON :: a -> Maybe Value
 
-instance MaybeToJSON TagField where
-  maybeToJSON :: TagField -> Maybe Value
-  maybeToJSON (SingleTagField ms) = toJSON <$> ms
-  maybeToJSON (MultiTagField ml) = toJSON <$> ml
-
 instance (ToJSON a) => MaybeToJSON (Maybe a) where
   maybeToJSON :: Maybe a -> Maybe Value
   maybeToJSON (Just a) = Just (toJSON a)
@@ -188,38 +222,6 @@ instance ToJSON MPDIdToJSON where
 instance ToJSON MPDPathToJSON where
   toJSON :: MPDPathToJSON -> Value
   toJSON (MPDPathToJSON p) = toJSON $ MPD.toString p
-
-
-instance ToJSON Tags where
-  toJSON :: Tags -> Value
-  toJSON tag = objectMaybes
-    [ "artist"                     .=? tag.artist
-    , "artist_sort"                .=? tag.artistSort
-    , "album"                      .=? tag.album
-    , "album_sort"                 .=? tag.albumSort
-    , "album_artist"               .=? tag.albumArtist
-    , "album_artist_sort"          .=? tag.albumArtistSort
-    , "title"                      .=? tag.title
-    , "track"                      .=? tag.track
-    , "name"                       .=? tag.name
-    , "genre"                      .=? tag.genre
-    , "date"                       .=? tag.date
-    , "original_date"              .=? tag.originalDate
-    , "composer"                   .=? tag.composer
-    , "performer"                  .=? tag.performer
-    , "conductor"                  .=? tag.conductor
-    , "work"                       .=? tag.work
-    , "grouping"                   .=? tag.grouping
-    , "comment"                    .=? tag.comment
-    , "disc"                       .=? tag.disc
-    , "label"                      .=? tag.label
-    , "musicbrainz_artistid"       .=? tag.musicbrainzArtistId
-    , "musicbrainz_albumid"        .=? tag.musicbrainzAlbumId
-    , "musicbrainz_albumartistid"  .=? tag.musicbrainzAlbumartistId
-    , "musicbrainz_trackid"        .=? tag.musicbrainzTrackId
-    , "musicbrainz_releasetrackid" .=? tag.musicbrainzReleasetrackId
-    , "musicbrainz_workid"         .=? tag.musicbrainzWorkId
-    ]
 
 instance ToJSON Status where
   toJSON :: Status -> Value
