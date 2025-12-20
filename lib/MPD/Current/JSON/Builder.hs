@@ -1,21 +1,19 @@
 module MPD.Current.JSON.Builder
-    ( currentStatus
-    , currentPlaylist
-    , currentFile
+    ( mkStatus
+    , mkPlaylist
+    , mkFile
     ) where
 
--- import MPD.Current.JSON.Types
+
 import MPD.Current.JSON.Types qualified as Current
 import Network.MPD qualified as MPD
 import Text.Read ( readMaybe )
 import Text.Printf ( printf )
-import GHC.Num
+import GHC.Num ( integerToInt )
 
--- currentMPDState is in Main
-
-currentStatus :: MPD.Status -> Current.Status
-currentStatus st = Current.Status
-  { Current.state          = (Current.MPDPlaybackState st.stState)
+mkStatus :: MPD.Status -> Current.Status
+mkStatus st = Current.Status
+  { Current.state          = Current.MPDPlaybackState st.stState
   , Current.repeat         = st.stRepeat
   , Current.random         = st.stRandom
   , Current.single         = st.stSingle
@@ -41,8 +39,8 @@ currentStatus st = Current.Status
         then readMaybe $ printf "%02.2f" elapsedPercent :: Maybe Double
         else Nothing
 
-currentPlaylist :: MPD.Status -> Current.Playlist
-currentPlaylist st = Current.Playlist
+mkPlaylist :: MPD.Status -> Current.Playlist
+mkPlaylist st = Current.Playlist
   { Current.position     = st.stSongPos
   , Current.nextPosition = st.stNextSongPos
   , Current.id           = Current.MPDId <$> st.stSongID
@@ -50,8 +48,8 @@ currentPlaylist st = Current.Playlist
   , Current.length       = fromIntegral st.stPlaylistLength
   }
 
-currentFile :: MPD.Song -> MPD.Song -> Current.File
-currentFile cs ns = Current.File
+mkFile :: MPD.Song -> MPD.Song -> Current.File
+mkFile cs ns = Current.File
   { Current.currentFile = if null $ MPD.toString cs.sgFilePath
                           then Nothing
                           else Just $ Current.MPDPath cs.sgFilePath

@@ -52,7 +52,7 @@ main = do
 
 printEncoded :: Opts -> MPD.Song -> MPD.Song -> MPD.Status -> IO ()
 printEncoded opts cs ns status =
-  let mpdState = currentMPDState opts cs ns status
+  let mpdState = mkState opts cs ns status
       finalJson = case opts.optNext of
                     OnlyNextSong -> object ["tags" .= mpdState.mpdNextTags]
                     _ -> toJSON mpdState
@@ -94,13 +94,13 @@ customEncodeConf = defConfig
  }
 
 -- | Main builder function that creates the complete state
-currentMPDState :: Opts -> MPD.Song -> MPD.Song -> MPD.Status -> State
-currentMPDState opts currentSong nextSong status =
+mkState :: Opts -> MPD.Song -> MPD.Song -> MPD.Status -> State
+mkState opts currentSong nextSong status =
   State
-  { mpdFiles = Builder.currentFile currentSong nextSong
-  , mpdStatus = Builder.currentStatus status
-  , mpdPlaylist = Builder.currentPlaylist status
-  , mpdTags = getTags currentSong
+  { mpdFile     = Builder.mkFile currentSong nextSong
+  , mpdStatus   = Builder.mkStatus status
+  , mpdPlaylist = Builder.mkPlaylist status
+  , mpdTags     = getTags currentSong
   , mpdNextTags = case opts.optNext of
       NoNextSong      -> Nothing
       OnlyNextSong    -> Just (getTags nextSong)

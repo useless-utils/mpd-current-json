@@ -32,7 +32,6 @@ import Data.String
 
 
 data MPDCurrentJSONTag
-
 instance StringModifier MPDCurrentJSONTag where
   getStringModifier s =
     case L.stripPrefix "musicbrainz" s of
@@ -183,7 +182,7 @@ instance FromJSON MPDPath where
 
 -- | Complete MPD State
 data State = State
-  { mpdFiles    :: !File
+  { mpdFile     :: !File
   , mpdStatus   :: !Status
   , mpdPlaylist :: !Playlist
   , mpdTags     :: !Tags
@@ -194,13 +193,13 @@ data State = State
 instance ToJSON State where
   toJSON :: State -> Value
   toJSON state = object $
-    [ "filename" .= toJSON state.mpdFiles.currentFile
+    [ "filename" .= toJSON state.mpdFile.currentFile
     , "status"   .= toJSON state.mpdStatus
     , "playlist" .= toJSON state.mpdPlaylist
     , "tags"     .= state.mpdTags
     ] <> case state.mpdNextTags of
            Nothing -> []
            Just nextTags -> [ "next" .= object
-                              [ "filename" .= toJSON state.mpdFiles.nextFile
+                              [ "filename" .= toJSON state.mpdFile.nextFile
                               , "tags" .= nextTags
                               ] ]
