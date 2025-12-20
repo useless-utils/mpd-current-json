@@ -15,7 +15,7 @@ import GHC.Num
 
 currentStatus :: MPD.Status -> Current.Status
 currentStatus st = Current.Status
-  { Current.state          = st.stState
+  { Current.state          = (Current.MPDPlaybackState st.stState)
   , Current.repeat         = st.stRepeat
   , Current.random         = st.stRandom
   , Current.single         = st.stSingle
@@ -45,8 +45,8 @@ currentPlaylist :: MPD.Status -> Current.Playlist
 currentPlaylist st = Current.Playlist
   { Current.position     = st.stSongPos
   , Current.nextPosition = st.stNextSongPos
-  , Current.id           = st.stSongID
-  , Current.nextId       = st.stNextSongID
+  , Current.id           = Current.MPDId <$> st.stSongID
+  , Current.nextId       = Current.MPDId <$> st.stNextSongID
   , Current.length       = fromIntegral st.stPlaylistLength
   }
 
@@ -54,8 +54,8 @@ currentFile :: MPD.Song -> MPD.Song -> Current.File
 currentFile cs ns = Current.File
   { Current.currentFile = if null $ MPD.toString cs.sgFilePath
                           then Nothing
-                          else Just cs.sgFilePath
+                          else Just $ Current.MPDPath cs.sgFilePath
   , Current.nextFile    = if null $ MPD.toString ns.sgFilePath
                           then Nothing
-                          else Just ns.sgFilePath
+                          else Just $ Current.MPDPath ns.sgFilePath
   }

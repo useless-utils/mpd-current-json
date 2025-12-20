@@ -15,6 +15,9 @@ module MPD.Current.JSON.Types
     , Playlist(..)
     , File(..)
     , State(..)
+    , MPDPath(..)
+    , MPDPlaybackState(..)
+    , MPDId(..)
     ) where
 
 import Network.MPD qualified as MPD
@@ -90,7 +93,7 @@ instance FromJSON TagField where
 
 
 data Status = Status
-  { state          :: !MPD.PlaybackState
+  { state          :: !MPDPlaybackState
   , repeat         :: !Bool
   , random         :: !Bool
   , single         :: !Bool
@@ -116,25 +119,28 @@ data Status = Status
    , OmitNothingFields
    ] Status
 
-instance ToJSON MPD.PlaybackState where
-  toJSON :: MPD.PlaybackState -> Value
-  toJSON MPD.Playing = "playing"
-  toJSON MPD.Paused  = "paused"
-  toJSON MPD.Stopped = "stopped"
+newtype MPDPlaybackState = MPDPlaybackState MPD.PlaybackState
+  deriving stock (Show, Eq, Generic)
 
-instance FromJSON MPD.PlaybackState where
+instance ToJSON MPDPlaybackState where
+  toJSON :: MPDPlaybackState -> Value
+  toJSON (MPDPlaybackState MPD.Playing) = "playing"
+  toJSON (MPDPlaybackState MPD.Paused)  = "paused"
+  toJSON (MPDPlaybackState MPD.Stopped) = "stopped"
+
+instance FromJSON MPDPlaybackState where
   parseJSON = withText "MPD.PlaybackState" $ \state -> do
     case state of
-      "playing" -> pure MPD.Playing
-      "paused"  -> pure MPD.Paused
-      "stopped" -> pure MPD.Playing
+      "playing" -> pure (MPDPlaybackState MPD.Playing)
+      "paused"  -> pure (MPDPlaybackState MPD.Paused)
+      "stopped" -> pure (MPDPlaybackState MPD.Playing)
       _         -> fail $ "Unknown playback state: " ++ show state
 
 data Playlist = Playlist
   { position     :: !(Maybe MPD.Position)
   , nextPosition :: !(Maybe MPD.Position)
-  , id           :: !(Maybe MPD.Id)
-  , nextId       :: !(Maybe MPD.Id)
+  , id           :: !(Maybe MPDId)
+  , nextId       :: !(Maybe MPDId)
   , length       :: !Int
   }
   deriving stock (Show, Eq, Generic)
@@ -143,16 +149,19 @@ data Playlist = Playlist
    , OmitNothingFields
    ] Playlist
 
-instance ToJSON MPD.Id where
-  toJSON :: MPD.Id -> Value
-  toJSON (MPD.Id i) = toJSON $ i
+newtype MPDId = MPDId MPD.Id
+  deriving stock (Show, Eq, Generic)
 
-instance FromJSON MPD.Id where
-  parseJSON v = MPD.Id <$> parseJSON v
+instance ToJSON MPDId where
+  toJSON :: MPDId -> Value
+  toJSON (MPDId (MPD.Id i)) = toJSON i
+
+instance FromJSON MPDId where
+  parseJSON v = MPDId . MPD.Id <$> parseJSON v
 
 data File = File
-  { currentFile :: !(Maybe MPD.Path)  -- ^ current song file path
-  , nextFile    :: !(Maybe MPD.Path)  -- ^ next song file path
+  { currentFile :: !(Maybe MPDPath)  -- ^ current song file path
+  , nextFile    :: !(Maybe MPDPath)  -- ^ next song file path
   }
   deriving stock (Show, Eq, Generic)
   deriving (ToJSON, FromJSON) via CustomJSON
@@ -161,17 +170,16 @@ data File = File
    , OmitNothingFields
    ] File
 
-instance ToJSON MPD.Path where
-  toJSON p = toJSON $ MPD.toString p
+newtype MPDPath = MPDPath MPD.Path
+  deriving stock (Show, Eq, Generic)
 
-instance FromJSON MPD.Path where
+instance ToJSON MPDPath where
+  toJSON :: MPDPath -> Value
+  toJSON (MPDPath p) = toJSON $ MPD.toString p
+
+instance FromJSON MPDPath where
   parseJSON = withText "MPD.Path" $ \path -> do
-    pure $ fromString . T.unpack $ path
-
--- newtype MPDPathToJSON = MPDPathToJSON MPD.Path
--- instance ToJSON MPDPathToJSON where
---   toJSON :: MPDPathToJSON -> Value
---   toJSON (MPDPathToJSON p) = toJSON $ MPD.toString p
+    pure . MPDPath . fromString . T.unpack $ path
 
 -- | Complete MPD State
 data State = State
