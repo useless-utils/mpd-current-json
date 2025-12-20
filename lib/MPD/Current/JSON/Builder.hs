@@ -1,4 +1,4 @@
-module MPD.Current.JSON.Builders
+module MPD.Current.JSON.Builder
     ( currentStatus
     , currentPlaylist
     , currentFile

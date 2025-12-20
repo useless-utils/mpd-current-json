@@ -5,8 +5,7 @@ module Main ( main ) where
 
 
 import MPD.Current.JSON.Types ( State(..) )
-import MPD.Current.JSON.Builders
-    ( currentStatus, currentPlaylist, currentFile )
+import MPD.Current.JSON.Builder qualified as Builder
 import MPD.Current.JSON.Parse ( getTags )
 import Network.MPD qualified as MPD
 import Options
@@ -64,7 +63,7 @@ customEncodeConf = defConfig
  { confCompare =
      keyOrder
      -- top level labels
-     [ "filename", "next_filename", "status", "playlist", "tags", "next"
+     [ "filename", "status", "playlist", "tags", "next"
      -- tags
      , "title", "name"
      , "artist", "album_artist", "artist_sort", "album_artist_sort"
@@ -98,9 +97,9 @@ customEncodeConf = defConfig
 currentMPDState :: Opts -> MPD.Song -> MPD.Song -> MPD.Status -> State
 currentMPDState opts currentSong nextSong status =
   State
-  { mpdFiles = currentFile currentSong nextSong
-  , mpdStatus = currentStatus status
-  , mpdPlaylist = currentPlaylist status
+  { mpdFiles = Builder.currentFile currentSong nextSong
+  , mpdStatus = Builder.currentStatus status
+  , mpdPlaylist = Builder.currentPlaylist status
   , mpdTags = getTags currentSong
   , mpdNextTags = case opts.optNext of
       NoNextSong      -> Nothing

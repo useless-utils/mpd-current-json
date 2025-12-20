@@ -1,3 +1,8 @@
+# v3.0
+- refactor internal types
+- change json output, move next filename information to under `next`,
+  now nested as `next.filename` and behind the `-n` cli flag.
+
 # v2.1
 - Fix multi-value tag arrays being in reverse order.
 

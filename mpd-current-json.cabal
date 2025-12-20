@@ -35,7 +35,7 @@ source-repository head
 library
     -- exposed: False
     exposed-modules:  MPD.Current.JSON.Parse
-                      MPD.Current.JSON.Builders
+                      MPD.Current.JSON.Builder
                       MPD.Current.JSON.Types
     build-depends:  base >=4.16 && <5
                   , libmpd == 0.10.*
@@ -43,6 +43,7 @@ library
                   , aeson-pretty == 0.8.*
                   , deriving-aeson ^>=0.2.10
                   , bytestring >=0.11 && <0.13
+                  , text ^>=2.1.3
     hs-source-dirs: lib
     default-language: GHC2021
     default-extensions: LambdaCase
