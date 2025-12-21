@@ -31,13 +31,27 @@ import Data.Text qualified as T
 import Data.String
 
 
+-- | Deriving.Aeson ghost type
 data MPDCurrentJSONTag
+
+{- | Custom field label string modifier for Tags
+
+Lowercase @musicbrainz@ fields by separating them with @_@, otherwise
+default to CamelToSnake.
+-}
 instance StringModifier MPDCurrentJSONTag where
   getStringModifier s =
     case L.stripPrefix "musicbrainz" s of
       Just xs -> "musicbrainz_" ++ map toLower xs
       Nothing -> camelTo2 '_' s
 
+
+{- | Sum type for either a single string or list of strings.
+
+`Network.MPD.sgGetTag' always returns a list of values for the given
+`Network.MPD.Metadata', so to make the output JSON only use direct
+strings vs an array, use this sum type.
+-}
 data TagField = SingleTagField !String
               | MultiTagField ![String]
   deriving stock (Show, Eq, Generic)
@@ -45,6 +59,9 @@ data TagField = SingleTagField !String
 {- | Store the parsed output of 'getTag'.
 
 Each field represents a supported MPD tag.
+
+@Maybe@ is used so `Deriving.Aeson.OmitNothingFields' can skip fields
+that would otherwise be null in the encoded JSON.
 -}
 data Tags = Tags
   { artist                    :: !(Maybe TagField)
@@ -90,7 +107,6 @@ instance FromJSON TagField where
         (SingleTagField <$> parseJSON v)
     <|> (MultiTagField <$> parseJSON v)
 
-
 data Status = Status
   { state          :: !MPDPlaybackState
   , repeat         :: !Bool
@@ -118,6 +134,7 @@ data Status = Status
    , OmitNothingFields
    ] Status
 
+-- | @newtype@ wrapper for otherwise orphan instance. Address warning GHC-90177.
 newtype MPDPlaybackState = MPDPlaybackState MPD.PlaybackState
   deriving stock (Show, Eq, Generic)
 
@@ -148,6 +165,7 @@ data Playlist = Playlist
    , OmitNothingFields
    ] Playlist
 
+-- | @newtype@ wrapper for otherwise orphan instance. Address warning GHC-90177.
 newtype MPDId = MPDId MPD.Id
   deriving stock (Show, Eq, Generic)
 
@@ -169,6 +187,8 @@ data File = File
    , OmitNothingFields
    ] File
 
+
+-- | @newtype@ wrapper for otherwise orphan instance. Address warning GHC-90177.
 newtype MPDPath = MPDPath MPD.Path
   deriving stock (Show, Eq, Generic)
 
@@ -180,7 +200,7 @@ instance FromJSON MPDPath where
   parseJSON = withText "MPD.Path" $ \path -> do
     pure . MPDPath . fromString . T.unpack $ path
 
--- | Complete MPD State
+-- | Complete MPD State. Where other states will be stored into and JSON encoded.
 data State = State
   { mpdFile     :: !File
   , mpdStatus   :: !Status
@@ -190,6 +210,7 @@ data State = State
   }
   deriving stock (Show, Eq, Generic)
 
+-- | Custom output for encoded 'State'.
 instance ToJSON State where
   toJSON :: State -> Value
   toJSON state = object $

@@ -8,10 +8,12 @@ module MPD.Current.JSON.Parse
     ) where
 
 import MPD.Current.JSON.Types ( Tags(..), TagField(..) )
-import Data.Maybe ( listToMaybe, fromMaybe )
 import Network.MPD ( Metadata(..) )
 import qualified Network.MPD as MPD
 
+
+-- | Builder for `Tags' from `Network.MPD.Song' that assigns `TagField' values
+-- based on them being a single string or multi-value array.
 getTags :: MPD.Song -> Tags
 getTags song = Tags
   { artist                    = getTag Artist                     song
@@ -42,56 +44,13 @@ getTags song = Tags
   , musicbrainzWorkId         = getTag MUSICBRAINZ_WORKID         song
   }
 
+
+-- | Parse single or multi `Network.MPD.Value'
 getTag :: Metadata -> MPD.Song -> Maybe TagField
 getTag tag song = tagSingleOrList (MPD.sgGetTag tag song)
   where
     tagSingleOrList :: Maybe [MPD.Value] -> Maybe TagField
     tagSingleOrList val = case val of
-      Just [v] -> Just $ SingleTagField $ MPD.toString v
-      Just v -> Just $ MultiTagField $ map MPD.toString v
+      Just [v] -> Just . SingleTagField $ MPD.toString v
+      Just v -> Just . MultiTagField $ map MPD.toString v
       Nothing -> Nothing
-
-
-{- | Convert 'Network.MPD.Value' to @String@ within a @Maybe@ context.
-
-'MPD.sgGetTag' returns a @Maybe [Value]@. [libmpd](Network.MPD) also
-provides 'Network.MPD.toString' that can also, along with @ByteString@
-and @Text@, convert a 'Network.MPD.Value' to a @String@.
--}
-singleValueToString :: Maybe MPD.Value -> Maybe String
-singleValueToString (Just x) = Just (MPD.toString x)
-singleValueToString Nothing = Nothing
-
-{- | Same as 'singleValueToString' but converts all @Value@s in the
-multi-value-tag list to @String@ and returns the list.
-
-`reverse' is used here because multi-value tags are returned in
-reverse order by [libmpd](Network.MPD), e.g. if a song has a
-multi-value @artist@ tag that contains "Artist1; Artist2; Artist3",
-the returned value of 'Network.MPD.Song.sgTags' from
-`Network.MPD.playlistInfo' @-> [Song]@ (which is a way of fetching the
-next song) would be @["Artist3", "Artist2", "Artist1"]@.
--}
-multiValueToString :: Maybe [MPD.Value] -> Maybe [String]
-multiValueToString (Just x) = Just $ reverse $ map MPD.toString x
-multiValueToString Nothing = Nothing
-
-fromResponseStatusField :: MPD.Response MPD.Status -> (MPD.Status -> a) -> Maybe a
-fromResponseStatusField (Right st) f = Just (f st)
-fromResponseStatusField _ _ = Nothing
-
-{- | Go a level deeper than `getStatusField'. For nested @Maybe a@
-fields from 'Network.MPD.Status'.
-
-==== __Example__:
-
-@
-ghci> import qualified Network.MPD as MPD
-ghci> st <- MPD.withMPD MPD.status
-ghci> fromResponseStatusFieldElement st MPD.stVolume
-@
-Just 100
--}
-fromResponseStatusFieldElement :: MPD.Response MPD.Status -> (MPD.Status -> Maybe a) -> Maybe a
-fromResponseStatusFieldElement status item =
-  fromMaybe Nothing $ fromResponseStatusField status item
